@@ -26,12 +26,6 @@
 #define add_cal_report_azm_inc	0x0800
 #define add_cal_report_dist		0x0900
 #define add_options				0x0102
-//#define Settings_Initialized_Key		0xB4   //  Unique key in EEPROM to indicate settings have been saved on EEPROM
-//#define Add_Settings_Initialized_Key	0x0100 //  Address of key
-//#define Cal_Initialized_Key				0xA6   // Unique key in EEPROM to indicate calibration coefficients have been saved
-//#define Add_Cal_Initialized_Key			0x0200 //  Address of key
-
-
 
 extern struct INST_CAL a1_calst, a2_calst, c1_calst, c2_calst, dist_calst;
 extern struct CAL_REPORT cal_report_azm_inc, cal_report_dist;
@@ -42,16 +36,13 @@ extern struct BACKLIGHT_SETTING backlight_setting;
 
 
 void load_user_settings(void){
-	uint8_t bytes_options;
-	uint8_t read_buf[2];
 	
 	//  Load example options structure to find initialized key
 	struct OPTIONS tempOptions;
 	getDefaultOptions(&tempOptions);
 	
 	//  Read options structure from EEPROM
-	bytes_options = sizeof(options);
-	EEPROM_read(add_options, &options, bytes_options);
+	EEPROM_read(add_options, &options, sizeof(options));
 	
 	if (options.Settings_Initialized_Key != tempOptions.Settings_Initialized_Key){
 		// Settings in EEPROM not initialized or are out of date
@@ -65,35 +56,26 @@ void load_user_settings(void){
 }
 
 void save_user_settings(void){
-	uint8_t write_buf[2];
-	
-	uint8_t bytes_options;	
-	bytes_options = sizeof(options);
 
 	// Save User Options
-	EEPROM_write(add_options, &options, bytes_options);
+	EEPROM_write(add_options, &options, sizeof(options));
 	
-
 }
 
 
 void load_calibration(void){
-	uint8_t bytes_calst, bytes_report;
-	bytes_report = sizeof(cal_report_azm_inc);
-	bytes_calst = sizeof(a1_calst);
-	
 	
 	//  Create example calibration structure to find initialization key
 	struct INST_CAL tempCal;	
 	cal_init_struct(&tempCal);
 	//  Read All  calibration structure back	
-	EEPROM_read(add_a1_calst, &a1_calst, bytes_calst); 
-	EEPROM_read(add_a2_calst, &a2_calst, bytes_calst);
-	EEPROM_read(add_c1_calst, &c1_calst, bytes_calst);
-	EEPROM_read(add_c2_calst, &c2_calst, bytes_calst);
-	EEPROM_read(add_dist_calst, &dist_calst, bytes_calst);
-	EEPROM_read(add_cal_report_azm_inc, &cal_report_azm_inc, bytes_report);
-	EEPROM_read(add_cal_report_dist, &cal_report_dist, bytes_report);
+	EEPROM_read(add_a1_calst, &a1_calst, sizeof(a1_calst)); 
+	EEPROM_read(add_a2_calst, &a2_calst, sizeof(a1_calst));
+	EEPROM_read(add_c1_calst, &c1_calst, sizeof(a1_calst));
+	EEPROM_read(add_c2_calst, &c2_calst, sizeof(a1_calst));
+	EEPROM_read(add_dist_calst, &dist_calst, sizeof(a1_calst));
+	EEPROM_read(add_cal_report_azm_inc, &cal_report_azm_inc, sizeof(cal_report_azm_inc));
+	EEPROM_read(add_cal_report_dist, &cal_report_dist, sizeof(cal_report_azm_inc));
 	
 	// assume first struct is representative of remainder
 	if(tempCal.Cal_Initialized_Key != a1_calst.Cal_Initialized_Key){

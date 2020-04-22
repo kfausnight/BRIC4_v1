@@ -315,7 +315,7 @@ int main (void)
 	system_init();
 	delay_init();
 	delay_ms(500);	
-	wdt_enable();
+	wdt_enable();//******************debug
 	setup_spi();
 	configure_i2c_master();	
 	glcd_init();
@@ -327,7 +327,6 @@ int main (void)
 	setup_mag(&slave_mag1);
 	setup_mag(&slave_mag2);
 	configure_usart();
-	configure_usart_callbacks();	
 	ext_osc_onoff(true);
 	setup_XOSC32k();
 	clock_32k_source(clock_ext);
@@ -354,7 +353,7 @@ int main (void)
 			while(current_input == input_none);//hold here until an input
 			clock_16M_source(clock_high);// Move clock back to high speed
 		}
-		wdt_reset_count();//
+		wdt_reset_count();//******************debug
 		//  Determine if idle powerdown will be performed
 		idle_timeout();//Will produce input=idle_timeout if idle for too long
 		
@@ -663,6 +662,8 @@ void fn_acc_comp_calibration(void){
 			// Handled by state machine
 			//  Exit from routine
 			break;
+		default:
+			break;
 	}
 	last_input = input_none;	
 	
@@ -701,7 +702,7 @@ void fn_acc_comp_calibration(void){
 void fn_loop_test(void){
 	struct MEASUREMENT temp_meas;
 	//uint32_t timer_count;
-	uint8_t i, k;
+	uint8_t i;
 	
 	if (state_change){
 		cal_disp_message();
@@ -744,9 +745,11 @@ void fn_loop_test(void){
 			}
 			break;
 		case input_button4:
-		// Handled by state machine
-		//  Exit from routine
-		break;
+			// Handled by state machine
+			//  Exit from routine
+			break;
+		default:
+			break;
 	}
 	last_input = input_none;
 	
@@ -885,6 +888,8 @@ void fn_dist_calibration(void){
 			// Handled by state machine
 			//  Exit from routine
 			break;
+		default:
+			break;
 	}
 	last_input = input_none;
 	
@@ -999,6 +1004,8 @@ void  fn_disp_cal_report(void){
 			if (pageView<maxPages){pageView++;}
 			break;
 			//  ButtonE and Button4 exit, handled by state machine
+		default:
+			break;
 	}
 	glcd_tiny_set_font(Font5x7,5,7,32,127);
 	glcd_clear_buffer();
@@ -1074,9 +1081,6 @@ void  fn_disp_cal_report(void){
 
 
 FRESULT save_measurement(struct MEASUREMENT *meas_inst){
-	uint32_t btw;
-	//uint32_t bw;
-	//uint32_t *pbw;
 	UINT bw;
 	UINT *pbw;
 	char write_string_temp[511];
@@ -1261,18 +1265,20 @@ void fn_error_info(void){
 	// Button Handler
 	switch(last_input){
 		case input_button2:
-		if(shot_list_ind>0){
-			shot_list_ind--;
-		}
-		break;
+			if(shot_list_ind>0){
+				shot_list_ind--;
+			}
+			break;
 		case input_button3:
-		if(shot_list_ind<nshots){
-			shot_list_ind++;
-		}
-		break;
+			if(shot_list_ind<nshots){
+				shot_list_ind++;
+			}
+			break;
 		case input_button4:
-		//  Exit back to main screen, handled in state machine
-		break;
+			//  Exit back to main screen, handled in state machine
+			break;
+		default:
+			break;
 	}
 	
 	
@@ -1346,6 +1352,8 @@ void fn_menu1(void){
 				current_input = input_menu_debug;
 			}
 			break;
+		default:
+			break;
 	}
 	
 	//print soft key text
@@ -1412,7 +1420,8 @@ void fn_menu_debug(void){
 				//  Charger Debug
 				current_input = input_debug_charger;
 			}
-		
+		default:
+			break;
 	}
 	
 	// Display
@@ -1479,6 +1488,8 @@ void fn_menu_cal(void){
 			} else if (cur_Y==5){
 				current_input = input_loop_test;
 			}
+		default:
+			break;
 	}
 	
 	// Display
@@ -1559,6 +1570,8 @@ void fn_debug_backlight(void){
 			break;
 		case input_button3:
 			backlightCustomAdjust(colorRef, -1);
+			break;
+		default:
 			break;
 	}
 	
@@ -1657,6 +1670,8 @@ void fn_set_options(void){
 					backlightLevelToggle();
 					save_user_settings();
 					break;
+				default:
+					break;
 			}
 			
 
@@ -1717,10 +1732,6 @@ void fn_set_bluetooth(void){
 	char str_off[] = "Off";
 	char *str_ptr;
 	bool current_state;
-	static bool USART_enabled;
-	//debug
-	bool debug;
-	debug = ioport_get_pin_level(BLE_ota);
 	
 	if (state_change) {
 		cur_Y=2;
@@ -1764,6 +1775,8 @@ void fn_set_bluetooth(void){
 				}
 				
 			}
+		default:
+			break;
 	}
 
 
@@ -1790,8 +1803,7 @@ void fn_set_bluetooth(void){
 	//Display Pointer
 	sprintf(display_str, ">");
 	glcd_tiny_draw_string(18, cur_Y,display_str);
-	
-	debug = ioport_get_pin_level(BLE_ota);			
+			
 	//Display Status
 	if (ioport_get_pin_level(BLE_autorun)){ str_ptr = str_off;}
 	else{ str_ptr = str_on;}
@@ -1863,6 +1875,8 @@ void fn_set_clock(void){
 				current_input = input_state_complete;
 				}
 			else{++cur_X;}
+			break;
+		default:
 			break;
 	}
 	
@@ -2065,6 +2079,8 @@ void draw_arrows(uint8_t button){
 		case 3: // Display arrow at button 3
 			glcd_draw_line(116, 40, 120, 44, BLACK);
 			glcd_draw_line(120, 44, 124, 40, BLACK);
+			break;
+		default:
 			break;
 	}
 	
@@ -2336,7 +2352,7 @@ void fn_powerup(void){
 	setup_spi();
 	configure_i2c_master();
 	configure_usart();
-	configure_usart_callbacks();
+	//configure_usart_callbacks();
 	
 	glcd_init();
 	backlightOn();

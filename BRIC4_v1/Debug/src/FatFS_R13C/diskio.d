@@ -123,7 +123,7 @@ src/FatFS_R13C/diskio.d src/FatFS_R13C/diskio.o: \
  ../src/ASF/common/services/storage/ctrl_access/ctrl_access.h \
  ../src/config/conf_access.h ../src/ASF/common/boards/board.h \
  ../src/ASF/common2/boards/user_board/user_board.h \
- ../src/config/conf_board.h ../src/comms\sd_mmc_mem.h \
+ ../src/config/conf_board.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\string.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\xlocale.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\string.h \
@@ -384,8 +384,6 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-no
 ../src/ASF/common2/boards/user_board/user_board.h:
 
 ../src/config/conf_board.h:
-
-../src/comms\sd_mmc_mem.h:
 
 c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\string.h:
 

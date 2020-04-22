@@ -33,8 +33,9 @@ enum measurement_error_type{
 	laser_pattern_error	=	10,
 	laser_response_timeout= 11,
 	laser_unknown=			12,
-	inc_ang_err=			13,
-	azm_ang_err=			14,
+	laser_wrong_message =	13,
+	inc_ang_err=			14,
+	azm_ang_err=			15,
 	make8bit_measurement_error_type		= 0xff
 };
 
@@ -60,6 +61,7 @@ struct MEASUREMENT{
 };
 
 
+
 // miscellaneous
 void quick_measurement( struct MEASUREMENT *);
 void full_measurement( struct MEASUREMENT *, bool);
@@ -82,16 +84,12 @@ float parse_mag_data(uint8_t *);
 
 
 //Laser Distance Functions
-extern volatile bool reception_complete;
-extern volatile bool write_complete;
 void laser_on_off(bool);
 void beep_on_off(bool);
 void rangefinder_on_off(bool );
 void laser_parse_buffer(struct MEASUREMENT *meas_inst);
 void laser_delay(uint8_t);
 void laser_beep(void);
-
-
 
 
 #endif /* SENSORS_H_ */

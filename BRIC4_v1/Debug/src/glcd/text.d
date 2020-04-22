@@ -133,8 +133,7 @@ src/glcd/text.d src/glcd/text.o: ../src/glcd/text.c ../src/glcd/glcd.h \
  ../src/ASF/common/services/ioport/ioport.h \
  ../src/ASF/common/services/ioport/sam0/ioport.h \
  ../src/ASF/common/services/storage/ctrl_access/ctrl_access.h \
- ../src/config/conf_access.h ../src/comms\sd_mmc_mem.h \
- ../src/ASF/sam0/drivers/port/port.h \
+ ../src/config/conf_access.h ../src/ASF/sam0/drivers/port/port.h \
  ../src/ASF/sam0/drivers/rtc/rtc_count.h ../src/config/conf_clocks.h \
  ../src/ASF/sam0/drivers/system/interrupt/system_interrupt.h \
  ../src/ASF/sam0/drivers/system/interrupt/system_interrupt_saml21/system_interrupt_features.h \
@@ -473,8 +472,6 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-no
 ../src/ASF/common/services/storage/ctrl_access/ctrl_access.h:
 
 ../src/config/conf_access.h:
-
-../src/comms\sd_mmc_mem.h:
 
 ../src/ASF/sam0/drivers/port/port.h:
 

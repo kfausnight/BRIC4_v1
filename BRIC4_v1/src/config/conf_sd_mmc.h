@@ -56,7 +56,7 @@
 #define SD_MMC_SPI_MODE
 
 //Add for debug
-#define SD_MMC_ENABLE
+//#define SD_MMC_ENABLE //  Kfausnight 4/22/2020
 
 /* Define to enable the SDIO support */
 //#define SDIO_SUPPORT_ENABLE

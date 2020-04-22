@@ -8,6 +8,8 @@ src\ASF\common\services\usb\class\msc\device\udi_msc_desc.c
 
 src\ASF\common\services\usb\udc\udc.c
 
+src\ASF\sam0\drivers\sercom\spi\spi_interrupt.c
+
 src\ASF\sam0\drivers\usb\stack_interface\usb_device_udd.c
 
 src\ASF\sam0\drivers\usb\stack_interface\usb_dual.c
@@ -53,8 +55,6 @@ src\ASF\sam0\drivers\sercom\i2c\i2c_sam0\i2c_master.c
 src\ASF\sam0\drivers\sercom\i2c\i2c_sam0\i2c_master_interrupt.c
 
 src\ASF\sam0\drivers\sercom\sercom_interrupt.c
-
-src\ASF\sam0\drivers\sercom\spi\spi_interrupt.c
 
 src\ASF\sam0\drivers\sercom\usart\usart_interrupt.c
 

@@ -497,7 +497,6 @@ void cal_add_datapoint(struct MEASUREMENT *meas_inst, bool last_shot){
 void calc_orientation(struct MEASUREMENT *meas_inst){
 	uint8_t i;
 	float aXYZ[3], cXYZ[3];
-	float thetaX, thetaY, thetaZ;
 	
 	//  Take average reading from both sensors for each axis
 	for (i=0;i<3;i++){

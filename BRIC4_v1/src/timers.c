@@ -27,8 +27,8 @@ bool timer3_on_off = false;
 
 void wdt_enable(void){
 	wdt_get_config_defaults(&wdt_configuration);
-	//wdt_configuration.clock_source = GCLK_GENERATOR_2;// Uses internal 1khz clock
-	wdt_configuration.timeout_period = WDT_PERIOD_4096CLK;
+	// Uses internal 1khz clock
+	wdt_configuration.timeout_period = WDT_PERIOD_16384CLK;
 	wdt_set_config(&wdt_configuration);
 	
 	
@@ -87,6 +87,8 @@ void configure_timers(enum STATE timer_state){
 			configure_timer_quick3();
 		
 
+			break;
+		default:
 			break;
 	}
 

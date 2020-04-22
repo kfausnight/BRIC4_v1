@@ -49,9 +49,7 @@
 #  define CONF_SPI_H_INCLUDED
 
 #  define CONF_SPI_MASTER_ENABLE     true
-#  define CONF_SPI_SLAVE_ENABLE      true
-
-//#  define SPI_CALLBACK_MODE				true // defined in preprocessor
+//#  define CONF_SPI_SLAVE_ENABLE      true
 
 #endif /* CONF_SPI_H_INCLUDED */
 

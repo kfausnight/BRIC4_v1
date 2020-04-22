@@ -12,13 +12,13 @@
 extern struct OPTIONS options;
 
 
-const char colorStrWhite[]	= "White ";
-const char colorStrRed[]	= "Red   ";
-const char colorStrBlue[]	= "Blue  ";
-const char colorStrGreen[]	= "Green ";
-const char colorStrPurple[] = "Purple";
-const char colorStrCyan[]	= "Cyan  ";
-const char colorStrCustom[] = "custom";
+char colorStrWhite[]	= "White ";
+char colorStrRed[]	= "Red   ";
+char colorStrBlue[]	= "Blue  ";
+char colorStrGreen[]	= "Green ";
+char colorStrPurple[] = "Purple";
+char colorStrCyan[]	= "Cyan  ";
+char colorStrCustom[] = "custom";
 
 struct BACKLIGHTCOLOR colorCustom	= {.colorStringPtr = colorStrCustom,	.red = 15, .green = 15, .blue = 15};
 struct BACKLIGHTCOLOR colorWhite	= {.colorStringPtr = colorStrWhite,		.red = 22, .green = 30, .blue = 30};

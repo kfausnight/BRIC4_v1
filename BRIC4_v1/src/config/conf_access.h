@@ -57,15 +57,15 @@
 #include "compiler.h"
 #include "board.h"
 
-#define SD_MMC_ENABLE
-#define ACCESS_MEM_TO_RAM_ENABLED true
+//#define SD_MMC_ENABLE
+//#define ACCESS_MEM_TO_RAM_ENABLED true
 
 ////////////////////////   Added by Kris Fausnight 4/16/2020  ////////////////////////////////////////////////////////////
-//#define SD_MMC_SPI_ENABLE
+#define SD_MMC_SPI_ENABLE
 //#define USB_MASS_STORAGE_ENABLE
-#ifndef ACCESS_USB_ENABLED
+//#ifndef ACCESS_USB_ENABLED
 #define ACCESS_USB_ENABLED
-#endif
+//#endif
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 

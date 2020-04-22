@@ -52,18 +52,38 @@ struct spi_slave_inst	slave_SD;
 void spi_clear(void);
 
 //USART
-#define rx_buffer_length	20
-volatile uint8_t rx_buffer[rx_buffer_length];
-volatile uint8_t rx_buffer_index;
-volatile bool reception_complete;
-volatile bool write_complete;
+enum LASER_MESSAGE_TYPE{
+	NONE = 0x00,
+	SW_VERSION = 0x01,
+	DEVICE_TYPE = 0x02,
+	DEVICE_STATUS = 0x08,
+	READ_SLAVE_ADDRESS = 0x04,
+	SET_SLAVE_ADDRESS = 0x41,
+	LASER_ON = 0x42,
+	LASER_OFF = 0x43,
+	SINGLE_MEASUREMENT = 0x44,
+	CONT_MEASUREMENT = 0x45,
+	STOP_MEASUREMENT = 0x46,
+	BEEP_ON_OFF = 0x47,
+};
+
+volatile uint8_t rxBufferLaser[20];
+volatile uint8_t rxBufferLaserIndex;
+volatile uint8_t debugBuffer[200];
+volatile uint8_t debugBufferIndex;
+enum LASER_MESSAGE_TYPE laserMessageType(void);
 struct usart_module usart_laser;
 struct usart_module usart_BLE;
-void clear_rx_buffer(void);
-void usart_read_callback(struct usart_module *const usart_module);
-void usart_write_callback(struct usart_module *const usart_module);
+enum status_code writeLaser(uint8_t *tx_data,uint16_t length);
+void readLaserCallback(struct usart_module *const usart_module);
+void writeLaserCallback(struct usart_module *const usart_module);
 void configure_usart(void);
 void configure_usart_callbacks(void);
+bool isLaserTransmitComplete(void);
+bool isLaserReceiveComplete(void);
+void rxBufferLaserClear(void);
+//  Laser Message Types
+
 
 
 // I2C setup

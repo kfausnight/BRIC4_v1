@@ -9,6 +9,10 @@
 #include <comms\comms.h>
 
 extern bool USART_BLE_enabled;
+volatile bool LaserTransmitComplete;
+volatile bool LaserReceiveComplete;
+volatile enum LASER_MESSAGE_TYPE laserCurrentMessage;
+
 
 //Disable
 void disable_comms(void){
@@ -142,47 +146,118 @@ void configure_usart(void){
 	usart_enable(&usart_BLE);
 	USART_BLE_enabled = true;
 	
+	//  Setup Callbacks
+	configure_usart_callbacks();
 	
+	//  Initiate background read to buffer
+	rxBufferLaserIndex = 0;
+	debugBufferIndex = 0;
+	usart_read_job(&usart_laser, rxBufferLaser); // 
 }
 
 void configure_usart_callbacks(void)
 {
 	usart_register_callback(&usart_laser,
-	usart_write_callback, USART_CALLBACK_BUFFER_TRANSMITTED);
+	writeLaserCallback, USART_CALLBACK_BUFFER_TRANSMITTED);
 	usart_register_callback(&usart_laser,
-	usart_read_callback, USART_CALLBACK_BUFFER_RECEIVED);
+	readLaserCallback, USART_CALLBACK_BUFFER_RECEIVED);
 	usart_enable_callback(&usart_laser, USART_CALLBACK_BUFFER_TRANSMITTED);
 	usart_enable_callback(&usart_laser, USART_CALLBACK_BUFFER_RECEIVED);
 }
 
-void clear_rx_buffer(void){
+
+
+
+void readLaserCallback(struct usart_module *const usart_module)
+{
+	//***************debug*******************
+	debugBuffer[debugBufferIndex] = rxBufferLaser[rxBufferLaserIndex];
+	debugBufferIndex++;
+	if(debugBufferIndex>=sizeof(debugBuffer)){debugBufferIndex=0;}
+	//**************debug********************
+	if(rxBufferLaser[rxBufferLaserIndex]==0xA8){
+		//  End of message key received (per laser comm protocol)
+		LaserReceiveComplete=true;		
+		rxBufferLaserIndex = 0;
+		laserCurrentMessage = laserMessageType();;
+		
+	}else if(rxBufferLaser[rxBufferLaserIndex]==0xAA){
+		//  Start of message key received
+		LaserReceiveComplete=false;
+		rxBufferLaser[0]=0xAA;  //  Ensure message starts at beginning of buffer
+		rxBufferLaserIndex = 1;	// Next byte to be placed at 1	
+		laserCurrentMessage = NONE;
+	}else{
+		//  Not Start or end of message, continue filling buffer
+		rxBufferLaserIndex++;
+		if (rxBufferLaserIndex>=sizeof(rxBufferLaser)){
+			rxBufferLaserIndex = 0;
+		}
+		
+	}
+	//  Prepare to take another byte
+	usart_read_job(&usart_laser, &rxBufferLaser[rxBufferLaserIndex]);
+
+}
+
+void writeLaserCallback(struct usart_module *const usart_module)
+{
+	LaserTransmitComplete = true;
+}
+
+
+enum status_code writeLaser(uint8_t *tx_data, uint16_t length){
+	enum status_code writeStatus;
+	//clear_rx_buffer();
+	LaserTransmitComplete=false;
+	writeStatus = usart_write_buffer_job(&usart_laser, tx_data, length);
+	return writeStatus;
+}
+	
+	
+enum status_code readLaser(){
+	enum status_code readStatus;
+	//clear_rx_buffer();
+	//LaserReceiveComplete = false;
+	//Length of returned message is unknown
+	//usart_abort_job(&usart_laser, USART_TRANSCEIVER_RX);
+	//while(laserReadStatus());
+	//usart_abort_job(&usart_laser, USART_TRANSCEIVER_RX);
+	//clear_rx_buffer();
+	LaserReceiveComplete = false;
+	//rxBufferLaserIndex = 0;
+	//readStatus = usart_read_job(&usart_laser, rxBufferLaser); // 
+	//usart_read_job(&usart_laser, &rx_buffer[rx_buffer_index]);
+	return readStatus;
+};
+
+bool isLaserTransmitComplete(void){
+	return LaserTransmitComplete;
+}
+bool isLaserReceiveComplete(void){
+	return LaserReceiveComplete;
+}
+
+void rxBufferLaserClear(void){
+	//uint8_t i;
+	//for (i=0;i<sizeof(rxBufferLaser);i++){
+	//	rxBufferLaser[i] = 0;
+	//}
+	laserCurrentMessage = NONE;
+	LaserReceiveComplete=false;
+	rxBufferLaserIndex = 0;
+}
+
+//  Determine the type of message currently in the buffer
+enum LASER_MESSAGE_TYPE laserMessageType(void){
 	uint8_t i;
-	for (i=0; i<rx_buffer_length; i=i+1){
-		rx_buffer[i]=0x00;
+	for(i=0;i<sizeof(rxBufferLaser);i++){
+		if(rxBufferLaser[i]==0xAA){
+			return rxBufferLaser[i+2];
+		}
+		
 	}
-	rx_buffer_index=0;
-	usart_disable_transceiver(&usart_laser, USART_TRANSCEIVER_RX);
-	usart_enable_transceiver(&usart_laser, USART_TRANSCEIVER_RX);
-	usart_disable_transceiver(&usart_BLE, USART_TRANSCEIVER_RX);
-	usart_enable_transceiver(&usart_BLE, USART_TRANSCEIVER_RX);
-}
-
-
-void usart_read_callback(struct usart_module *const usart_module)
-{
-
-	if(rx_buffer[rx_buffer_index]==0xA8){
-		reception_complete=true;
-		}else{
-		rx_buffer_index=rx_buffer_index+1;
-		usart_read_job(&usart_laser, &rx_buffer[rx_buffer_index]);
-	}
-}
-
-void usart_write_callback(struct usart_module *const usart_module)
-{
-	write_complete = true;
-}
+};
 
 
 
