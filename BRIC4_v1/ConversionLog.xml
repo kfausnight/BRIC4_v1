@@ -1,35 +1,29 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <?xml-stylesheet type='text/xsl' href='ConversionLog.xslt'?>
-<conversion conversiontitle="Upgrade Report - Atmel Software Framework Upgrade Log" subtitle1="Upgrading Modules From" subtitle2="to" date="Saturday, May 19, 2018" time="3:17 PM">
+<conversion conversiontitle="Upgrade Report - Atmel Software Framework Upgrade Log" subtitle1="Upgrading Modules From" subtitle2="to" date="Thursday, April 23, 2020" time="6:34 PM">
   <general>
-    <log timestamp="05-19-2018 15-17-18">
+    <log timestamp="04-23-2020 18-34-48">
       <message>Unloading project</message>
     </log>
-    <log timestamp="05-19-2018 15-17-22">
+    <log timestamp="04-23-2020 18-34-48">
       <message>Project unload complete.</message>
     </log>
-    <log timestamp="05-19-2018 15-17-50">
-      <message>Backing up of project started.</message>
-    </log>
-    <log timestamp="05-19-2018 15-18-47">
-      <message>Project backup completed.</message>
-    </log>
-    <log timestamp="05-19-2018 15-18-47">
+    <log timestamp="04-23-2020 18-36-11">
       <message>Reloading project after backup.</message>
     </log>
-    <log timestamp="05-19-2018 15-19-22">
+    <log timestamp="04-23-2020 18-36-14">
       <message>Project reload complete.</message>
     </log>
-    <log timestamp="05-19-2018 15-19-32">
+    <log timestamp="04-23-2020 18-36-15">
       <message>Upgrading of project started.</message>
     </log>
-    <log timestamp="05-19-2018 15-22-32">
+    <log timestamp="04-23-2020 18-39-06">
       <message>Project upgrade complete</message>
     </log>
   </general>
-  <revert versiontext="3.34.1" description="Reverting from version">
+  <revert versiontext="3.39.0" description="Reverting from version">
     <moduleinfo name="Common build items for user board support templates">
-      <action description="Delete framework file 'src\ASF\common2\boards\user_board\init.c'." result="SUCCESS" resulttext="" />
+      <action description="Delete framework file 'src\ASF\common2\boards\user_board\init.c'." result="ERROR" resulttext="The Delete operation failed. Could not find the path specified 'src\ASF\common2\boards\user_board\init.c'. Resolution failed for folder: 'boards'" />
       <action description="Delete framework file 'src\ASF\common2\boards\user_board\user_board.h'." result="SUCCESS" resulttext="" />
       <action description="Remove folder '../src/ASF/common2/boards/user_board' from include search path." result="SUCCESS" resulttext="" />
       <action description="Remove defined symbol 'BOARD=USER_BOARD'." result="SUCCESS" resulttext="" />
@@ -198,8 +192,8 @@
       <action description="Delete framework file 'src\ASF\sam0\utils\linker_scripts\saml21\gcc\saml21g18b_flash.ld'." result="SUCCESS" resulttext="" />
     </moduleinfo>
   </revert>
-  <revert versiontext="3.34.1" description="Reverting from version" />
-  <update versiontext="3.35.1" description="Upgrading to version">
+  <revert versiontext="3.39.0" description="Reverting from version" />
+  <update versiontext="3.47.0" description="Upgrading to version">
     <moduleinfo name="Common build items for user board support templates">
       <action description="Import framework file as 'src\ASF\common2\boards\user_board\init.c'." result="SUCCESS" resulttext="" />
       <action description="Import framework file as 'src\ASF\common2\boards\user_board\user_board.h'." result="SUCCESS" resulttext="" />
@@ -230,10 +224,12 @@
       <action description="Import framework file as 'src\ASF\sam0\utils\make\Makefile.sam.in'." result="SUCCESS" resulttext="" />
     </moduleinfo>
     <moduleinfo name="CMSIS thirdparty sources">
-      <action description="Import framework file as 'src\ASF\thirdparty\CMSIS\Include\arm_math.h'." result="SUCCESS" resulttext="" />
-      <action description="Import framework file as 'src\ASF\thirdparty\CMSIS\Include\core_cmFunc.h'." result="SUCCESS" resulttext="" />
+      <action description="Import framework file as 'src\ASF\thirdparty\CMSIS\Include\cmsis_compiler.h'." result="SUCCESS" resulttext="" />
+      <action description="Import framework file as 'src\ASF\thirdparty\CMSIS\Include\mpu_armv7.h'." result="SUCCESS" resulttext="" />
       <action description="Import framework file as 'src\ASF\thirdparty\CMSIS\Include\core_cm0plus.h'." result="SUCCESS" resulttext="" />
-      <action description="Import framework file as 'src\ASF\thirdparty\CMSIS\Include\core_cmInstr.h'." result="SUCCESS" resulttext="" />
+      <action description="Import framework file as 'src\ASF\thirdparty\CMSIS\Include\arm_math.h'." result="SUCCESS" resulttext="" />
+      <action description="Import framework file as 'src\ASF\thirdparty\CMSIS\Include\cmsis_version.h'." result="SUCCESS" resulttext="" />
+      <action description="Import framework file as 'src\ASF\thirdparty\CMSIS\Include\cmsis_gcc.h'." result="SUCCESS" resulttext="" />
       <action description="Add folder '../src/ASF/thirdparty/CMSIS/Include' to include search path." result="SUCCESS" resulttext="" />
       <action description="Add folder '../src/ASF/thirdparty/CMSIS/Lib/GCC' to include search path." result="SUCCESS" resulttext="" />
       <action description="Define symbol 'ARM_MATH_CM0PLUS=true'." result="SUCCESS" resulttext="" />
@@ -370,9 +366,14 @@
       <action description="Import framework file as 'src\ASF\sam0\utils\linker_scripts\saml21\gcc\saml21g18b_flash.ld'." result="SUCCESS" resulttext="" />
     </moduleinfo>
   </update>
-  <update versiontext="3.35.1" description="Upgrading to version">
+  <update versiontext="3.47.0" description="Upgrading to version">
     <moduleinfo name="Generic board support">
       <action description="Import framework file as 'src\ASF\common\boards\board.h'." result="SUCCESS" resulttext="" />
+    </moduleinfo>
+    <moduleinfo name="Memory Control Access Interface">
+      <action description="Import framework file as 'src\ASF\common\services\storage\ctrl_access\ctrl_access.c'." result="SUCCESS" resulttext="" />
+      <action description="Import framework file as 'src\ASF\common\services\storage\ctrl_access\ctrl_access.h'." result="SUCCESS" resulttext="" />
+      <action description="Import framework file as 'src\Config\conf_access.h'." result="SUCCESS" resulttext="" />
     </moduleinfo>
     <moduleinfo name="PORT - GPIO Pin Control">
       <action description="Import framework file as 'src\ASF\sam0\drivers\port\port.c'." result="SUCCESS" resulttext="" />
@@ -404,6 +405,7 @@
     </moduleinfo>
     <moduleinfo name="USB CDC Protocol">
       <action description="Import framework file as 'src\ASF\common\services\usb\class\cdc\usb_protocol_cdc.h'." result="SUCCESS" resulttext="" />
+      <action description="Add folder '../src/ASF/common/services/usb/class/cdc' to include search path." result="SUCCESS" resulttext="" />
     </moduleinfo>
     <moduleinfo name="USB Device CDC (Single Interface Device)">
       <action description="Import framework file as 'src\ASF\common\services\usb\class\cdc\device\udi_cdc.c'." result="SUCCESS" resulttext="" />
@@ -413,6 +415,7 @@
       <action description="Import framework file as 'src\ASF\common\services\usb\class\cdc\device\udi_cdc.h'." result="SUCCESS" resulttext="" />
       <action description="Import framework file as 'src\ASF\common\services\usb\class\cdc\device\udi_cdc_conf.h'." result="SUCCESS" resulttext="" />
       <action description="Import framework file as 'src\Config\conf_usb.h'." result="SUCCESS" resulttext="" />
+      <action description="Add folder '../src/ASF/common/services/usb/class/cdc/device' to include search path." result="SUCCESS" resulttext="" />
     </moduleinfo>
     <moduleinfo name="USB Device Stack Core (Common API)">
       <action description="Import framework file as 'src\ASF\common\services\usb\udc\udc.c'." result="SUCCESS" resulttext="" />
@@ -428,6 +431,16 @@
     </moduleinfo>
     <moduleinfo name="Part identification macros">
       <action description="Import framework file as 'src\ASF\common\utils\parts.h'." result="SUCCESS" resulttext="" />
+    </moduleinfo>
+    <moduleinfo name="SD/MMC stack on SPI interface">
+      <action description="Import framework file as 'src\ASF\common2\components\memory\sd_mmc\sd_mmc.c'." result="SUCCESS" resulttext="" />
+      <action description="Import framework file as 'src\ASF\common2\components\memory\sd_mmc\sd_mmc_spi.c'." result="SUCCESS" resulttext="" />
+      <action description="Import framework file as 'src\ASF\common2\components\memory\sd_mmc\sd_mmc.h'." result="SUCCESS" resulttext="" />
+      <action description="Import framework file as 'src\ASF\common2\components\memory\sd_mmc\sd_mmc_spi.h'." result="SUCCESS" resulttext="" />
+      <action description="Import framework file as 'src\Config\conf_sd_mmc.h'." result="SUCCESS" resulttext="" />
+    </moduleinfo>
+    <moduleinfo name="SD/MMC/SDIO protocol definitions">
+      <action description="Import framework file as 'src\ASF\common2\components\memory\sd_mmc\sd_mmc_protocol.h'." result="SUCCESS" resulttext="" />
     </moduleinfo>
     <moduleinfo name="Delay routines">
       <action description="Import framework file as 'src\ASF\common2\services\delay\sam0\systick_counter.c'." result="SUCCESS" resulttext="" />
@@ -529,6 +542,16 @@
     </moduleinfo>
     <moduleinfo name="SAM D21/R21/D11/L21/L22/DA1 USB UDD interface">
       <action description="Import framework file as 'src\ASF\sam0\drivers\usb\stack_interface\usb_device_udd.c'." result="SUCCESS" resulttext="" />
+    </moduleinfo>
+    <moduleinfo name="WDT - Watchdog Timer (Callback APIs)">
+      <action description="Import framework file as 'src\ASF\sam0\drivers\wdt\wdt_callback.c'." result="SUCCESS" resulttext="" />
+      <action description="Import framework file as 'src\ASF\sam0\drivers\wdt\wdt.c'." result="SUCCESS" resulttext="" />
+      <action description="Import framework file as 'src\ASF\sam0\drivers\wdt\wdt_callback.h'." result="SUCCESS" resulttext="" />
+      <action description="Import framework file as 'src\ASF\sam0\drivers\wdt\wdt.h'." result="SUCCESS" resulttext="" />
+      <action description="Import framework file as 'src\ASF\sam0\drivers\wdt\quick_start\qs_wdt_basic.h'." result="SUCCESS" resulttext="" />
+      <action description="Import framework file as 'src\ASF\sam0\drivers\wdt\quick_start_callback\qs_wdt_callback.h'." result="SUCCESS" resulttext="" />
+      <action description="Define symbol 'WDT_CALLBACK_MODE=true'." result="SUCCESS" resulttext="" />
+      <action description="Add Assembler Flag '-DWDT_CALLBACK_MODE=true'." result="SUCCESS" resulttext="" />
     </moduleinfo>
     <moduleinfo name="Common SAM0 compiler driver">
       <action description="Import framework file as 'src\ASF\sam0\utils\compiler.h'." result="SUCCESS" resulttext="" />
@@ -649,10 +672,12 @@
       <action description="Import framework file as 'src\ASF\sam0\utils\syscalls\gcc\syscalls.c'." result="SUCCESS" resulttext="" />
     </moduleinfo>
     <moduleinfo name="CMSIS thirdparty sources">
-      <action description="Import framework file as 'src\ASF\thirdparty\CMSIS\Include\arm_math.h'." result="SUCCESS" resulttext="" />
-      <action description="Import framework file as 'src\ASF\thirdparty\CMSIS\Include\core_cmFunc.h'." result="SUCCESS" resulttext="" />
+      <action description="Import framework file as 'src\ASF\thirdparty\CMSIS\Include\cmsis_compiler.h'." result="SUCCESS" resulttext="" />
+      <action description="Import framework file as 'src\ASF\thirdparty\CMSIS\Include\mpu_armv7.h'." result="SUCCESS" resulttext="" />
       <action description="Import framework file as 'src\ASF\thirdparty\CMSIS\Include\core_cm0plus.h'." result="SUCCESS" resulttext="" />
-      <action description="Import framework file as 'src\ASF\thirdparty\CMSIS\Include\core_cmInstr.h'." result="SUCCESS" resulttext="" />
+      <action description="Import framework file as 'src\ASF\thirdparty\CMSIS\Include\arm_math.h'." result="SUCCESS" resulttext="" />
+      <action description="Import framework file as 'src\ASF\thirdparty\CMSIS\Include\cmsis_version.h'." result="SUCCESS" resulttext="" />
+      <action description="Import framework file as 'src\ASF\thirdparty\CMSIS\Include\cmsis_gcc.h'." result="SUCCESS" resulttext="" />
       <action description="Define symbol 'ARM_MATH_CM0PLUS=true'." result="SUCCESS" resulttext="" />
       <action description="Add Assembler Flag '-DARM_MATH_CM0PLUS=true'." result="SUCCESS" resulttext="" />
       <action description="Import framework file as 'src\ASF\thirdparty\CMSIS\Lib\GCC\libarm_cortexM0l_math.a'." result="SUCCESS" resulttext="" />

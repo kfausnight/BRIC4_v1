@@ -3,45 +3,35 @@
  *
  * \brief Common SPI interface for SD/MMC stack
  *
- * Copyright (c) 2014-2015 Atmel Corporation. All rights reserved.
+ * Copyright (c) 2014-2018 Microchip Technology Inc. and its subsidiaries.
  *
  * \asf_license_start
  *
  * \page License
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
+ * Subject to your compliance with these terms, you may use Microchip
+ * software and any derivatives exclusively with Microchip products.
+ * It is your responsibility to comply with third party license terms applicable
+ * to your use of third party software (including open source software) that
+ * may accompany Microchip software.
  *
- * 1. Redistributions of source code must retain the above copyright notice,
- *    this list of conditions and the following disclaimer.
- *
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
- *
- * 3. The name of Atmel may not be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * 4. This software may only be redistributed and used in connection with an
- *    Atmel microcontroller product.
- *
- * THIS SOFTWARE IS PROVIDED BY ATMEL "AS IS" AND ANY EXPRESS OR IMPLIED
- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT ARE
- * EXPRESSLY AND SPECIFICALLY DISCLAIMED. IN NO EVENT SHALL ATMEL BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
- * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
- * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * THIS SOFTWARE IS SUPPLIED BY MICROCHIP "AS IS". NO WARRANTIES,
+ * WHETHER EXPRESS, IMPLIED OR STATUTORY, APPLY TO THIS SOFTWARE,
+ * INCLUDING ANY IMPLIED WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY,
+ * AND FITNESS FOR A PARTICULAR PURPOSE. IN NO EVENT WILL MICROCHIP BE
+ * LIABLE FOR ANY INDIRECT, SPECIAL, PUNITIVE, INCIDENTAL OR CONSEQUENTIAL
+ * LOSS, DAMAGE, COST OR EXPENSE OF ANY KIND WHATSOEVER RELATED TO THE
+ * SOFTWARE, HOWEVER CAUSED, EVEN IF MICROCHIP HAS BEEN ADVISED OF THE
+ * POSSIBILITY OR THE DAMAGES ARE FORESEEABLE.  TO THE FULLEST EXTENT
+ * ALLOWED BY LAW, MICROCHIP'S TOTAL LIABILITY ON ALL CLAIMS IN ANY WAY
+ * RELATED TO THIS SOFTWARE WILL NOT EXCEED THE AMOUNT OF FEES, IF ANY,
+ * THAT YOU HAVE PAID DIRECTLY TO MICROCHIP FOR THIS SOFTWARE.
  *
  * \asf_license_stop
  *
  */
 /*
- * Support and FAQ: visit <a href="http://www.atmel.com/design-support/">Atmel Support</a>
+ * Support and FAQ: visit <a href="https://www.microchip.com/support/">Microchip Support</a>
  */
 
 #include <asf.h>
@@ -50,6 +40,7 @@
 #include "conf_sd_mmc.h"
 #include "sd_mmc_protocol.h"
 #include "sd_mmc_spi.h"
+#include "comms\comms.h"//Kfausnight 4/26/2020
 
 #ifdef SD_MMC_SPI_MODE
 
@@ -75,15 +66,30 @@
 #  define SD_MMC_SPI_MEM_CNT 1
 #endif
 
-//  Edits by Kris Fausnight ************************
-//  sd_mmc_master replaced by spi_main
-extern struct spi_module spi_main;
+//  Kfausnight 4/26/2020
+//extern struct spi_module spi_main;
 //static struct spi_module sd_mmc_master;
-//******************************
+#if (defined SD_MMC_0_CD_GPIO)//Added Kfausnight 11/24/2018
+// Initialize card detect pin
+struct port_config pin_conf;
+port_get_config_defaults(&pin_conf);
+
+// Set card detect pin as inputs
+pin_conf.direction	= PORT_PIN_DIR_INPUT;
+pin_conf.input_pull = PORT_PIN_PULL_UP;
+port_pin_set_config(SD_MMC_0_CD_GPIO, &pin_conf);
+#endif  //Added Kfausnight 11/24/2018
+//  End edit Kfausnight 4/26/2020
+
 //! Slot array of SPI structures
 static struct spi_slave_inst sd_mmc_spi_devices[SD_MMC_SPI_MEM_CNT];
 static struct spi_slave_inst_config slave_configs[SD_MMC_SPI_MEM_CNT];
 uint8_t ss_pins[SD_MMC_SPI_MEM_CNT] = {SD_MMC_CS};
+	
+	
+	
+	
+	
 
 //! Internal global error status
 static sd_mmc_spi_errno_t sd_mmc_spi_err;
@@ -146,9 +152,8 @@ static bool sd_mmc_spi_wait_busy(void)
 	/* Delay before check busy
 	 * Nbr timing minimum = 8 cylces
 	 */
-
 	spi_read_buffer_wait(&spi_main, &line, 1,
-		dummy);		
+			dummy);
 
 	/* Wait end of busy signal
 	 * Nec timing: 0 to unlimited
@@ -162,11 +167,9 @@ static bool sd_mmc_spi_wait_busy(void)
 		spi_read_buffer_wait(&spi_main, &line, 1,
 			dummy);
 		if (!(nec_timeout--)) {
-
 			return false;
 		}
 	} while (line != 0xFF);
-
 	return true;
 }
 
@@ -239,7 +242,6 @@ static void sd_mmc_spi_stop_read_block(void)
 static void sd_mmc_spi_start_write_block(void)
 {
 	uint8_t dummy = 0xFF;
-
 	Assert(!(sd_mmc_spi_transfert_pos % sd_mmc_spi_block_size));
 	// Delay before start write block:
 	// Nwr timing minimum = 8 cylces
@@ -252,7 +254,6 @@ static void sd_mmc_spi_start_write_block(void)
 		token = SPI_TOKEN_MULTI_WRITE;
 	}
 	spi_write_buffer_wait(&spi_main,&token, 1);
-
 }
 
 /**
@@ -345,16 +346,16 @@ void sd_mmc_spi_init(void)
 {
 	sd_mmc_spi_err = SD_MMC_SPI_NO_ERR;
 
-#if (defined SD_MMC_0_CD_GPIO)//Added Kfausnight 11/24/2018
 	// Initialize card detect pin
 	struct port_config pin_conf;
 	port_get_config_defaults(&pin_conf);
 
 	// Set card detect pin as inputs
+	#ifdef SD_MMC_0_CD_GPIO //Kfausnight 5/2/2020
 	pin_conf.direction	= PORT_PIN_DIR_INPUT;
 	pin_conf.input_pull = PORT_PIN_PULL_UP;
 	port_pin_set_config(SD_MMC_0_CD_GPIO, &pin_conf);
-#endif  //Added Kfausnight 11/24/2018
+	#endif //Kfausnight 5/2/2020
 
 	// Initialize SPI interface and enable it
 	struct spi_config config;
@@ -370,7 +371,7 @@ void sd_mmc_spi_init(void)
 
 	spi_init(&spi_main, SD_MMC_SPI, &config);
 	spi_enable(&spi_main);
-
+	
 	spi_slave_inst_get_config_defaults(&slave_configs[0]);
 	slave_configs[0].ss_pin = ss_pins[0];
 	spi_attach_slave(&sd_mmc_spi_devices[0], &slave_configs[0]);
@@ -388,16 +389,20 @@ void sd_mmc_spi_select_device(uint8_t slot, uint32_t clock, uint8_t bus_width,
 		clock = SD_MMC_SPI_MAX_CLOCK;
 	}
 #endif
+	/*  Kfausnight 20200721  No need to adjust clock, it is already set
 	while (STATUS_ERR_INVALID_ARG == spi_set_baudrate(&spi_main, clock)) {
 		clock -= clock / 8;
 	}
-	spi_select_slave(&spi_main, &sd_mmc_spi_devices[slot], true);
+	*/
+	//spi_select_slave(&spi_main, &sd_mmc_spi_devices[slot], true);
+	spi_select_slave(&spi_main, &slave_SD, true);//Kfausnight 20200721
 }
 
 void sd_mmc_spi_deselect_device(uint8_t slot)
 {
 	sd_mmc_spi_err = SD_MMC_SPI_NO_ERR;
-	spi_select_slave(&spi_main, &sd_mmc_spi_devices[slot], false);
+	//spi_select_slave(&spi_main, &sd_mmc_spi_devices[slot], false);
+	spi_select_slave(&spi_main, &slave_SD, false);//Kfausnight 20200721
 }
 
 void sd_mmc_spi_send_clock(void)
@@ -426,8 +431,6 @@ bool sd_mmc_spi_adtc_start(sdmmc_cmd_def_t cmd, uint32_t arg,
 	uint8_t r1; //! R1 response
 	uint16_t dummy2 = 0xFF;
 
-
-	
 	UNUSED(access_block);
 	Assert(cmd & SDMMC_RESP_PRESENT); // Always a response in SPI mode
 	sd_mmc_spi_err = SD_MMC_SPI_NO_ERR;
@@ -453,7 +456,6 @@ bool sd_mmc_spi_adtc_start(sdmmc_cmd_def_t cmd, uint32_t arg,
 	// WORKAROUND for no compliance card (Atmel Internal ref. SD13):
 	r1 = 0xFF;
 	// Ignore first byte because Ncr min. = 8 clock cylces
-
 	spi_read_buffer_wait(&spi_main, &r1, 1,
 			dummy2);
 	ncr_timeout = 7;

@@ -11,8 +11,9 @@ src/ASF/sam0/utils/cmsis/saml21/source/system_saml21.d \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\_intsup.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\_stdint.h \
  ../src/ASF/thirdparty/CMSIS/Include/core_cm0plus.h \
- ../src/ASF/thirdparty/CMSIS/Include/core_cmInstr.h \
- ../src/ASF/thirdparty/CMSIS/Include/core_cmFunc.h \
+ ../src/ASF/thirdparty/CMSIS/Include/cmsis_version.h \
+ ../src/ASF/thirdparty/CMSIS/Include/cmsis_compiler.h \
+ ../src/ASF/thirdparty/CMSIS/Include/cmsis_gcc.h \
  ../src/ASF/sam0/utils/cmsis/saml21/source/system_saml21.h \
  ../src/ASF/sam0/utils/cmsis/saml21/include_b/component/ac.h \
  ../src/ASF/sam0/utils/cmsis/saml21/include_b/component/adc.h \
@@ -103,9 +104,11 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-no
 
 ../src/ASF/thirdparty/CMSIS/Include/core_cm0plus.h:
 
-../src/ASF/thirdparty/CMSIS/Include/core_cmInstr.h:
+../src/ASF/thirdparty/CMSIS/Include/cmsis_version.h:
 
-../src/ASF/thirdparty/CMSIS/Include/core_cmFunc.h:
+../src/ASF/thirdparty/CMSIS/Include/cmsis_compiler.h:
+
+../src/ASF/thirdparty/CMSIS/Include/cmsis_gcc.h:
 
 ../src/ASF/sam0/utils/cmsis/saml21/source/system_saml21.h:
 

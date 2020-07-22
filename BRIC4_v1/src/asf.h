@@ -66,6 +66,12 @@
 #include <extint.h>
 #include <extint_callback.h>
 
+// From module: FatFS file system
+#include <diskio.h>
+#include <ff.h>
+#include <ffconf.h>
+#include <integer.h>
+
 // From module: Generic board support
 #include <board.h>
 
@@ -104,9 +110,11 @@
 #include <i2c_master.h>
 #include <i2c_master_interrupt.h>
 
-// From module: SERCOM SPI - Serial Peripheral Interface (Callback APIs)
+// From module: SERCOM Polled API
+#include <sercom.h>
+
+// From module: SERCOM SPI - Serial Peripheral Interface (Polled APIs)
 #include <spi.h>
-#include <spi_interrupt.h>
 
 // From module: SERCOM USART - Serial Communications (Callback APIs)
 #include <usart.h>
@@ -134,6 +142,9 @@
 // From module: Sleep manager - SAML implementation
 #include <saml/sleepmgr.h>
 #include <sleepmgr.h>
+
+// From module: Supported ports of FatFS
+#include <diskio.h>
 
 // From module: TC - Timer Counter (Callback APIs)
 #include <tc.h>

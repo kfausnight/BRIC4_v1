@@ -21,8 +21,9 @@ src/glcd/ST7565R.d src/glcd/ST7565R.o: ../src/glcd/ST7565R.c \
  ../src/ASF/sam0/utils/cmsis/saml21/include_b/saml21.h \
  ../src/ASF/sam0/utils/cmsis/saml21/include_b/saml21g18b.h \
  ../src/ASF/thirdparty/CMSIS/Include/core_cm0plus.h \
- ../src/ASF/thirdparty/CMSIS/Include/core_cmInstr.h \
- ../src/ASF/thirdparty/CMSIS/Include/core_cmFunc.h \
+ ../src/ASF/thirdparty/CMSIS/Include/cmsis_version.h \
+ ../src/ASF/thirdparty/CMSIS/Include/cmsis_compiler.h \
+ ../src/ASF/thirdparty/CMSIS/Include/cmsis_gcc.h \
  ../src/ASF/sam0/utils/cmsis/saml21/source/system_saml21.h \
  ../src/ASF/sam0/utils/cmsis/saml21/include_b/component/ac.h \
  ../src/ASF/sam0/utils/cmsis/saml21/include_b/component/adc.h \
@@ -144,7 +145,8 @@ src/glcd/ST7565R.d src/glcd/ST7565R.o: ../src/glcd/ST7565R.c \
  ../src/ASF/sam0/drivers/rtc/rtc_tamper.h \
  ../src/ASF/sam0/drivers/usb/stack_interface/usb_dual.h \
  ../src/ASF/common2/components/memory/sd_mmc/sd_mmc.h \
- ../src/config/conf_sd_mmc.h ../src/ASF/sam0/drivers/sercom/sercom.h \
+ ../src/config/conf_sd_mmc.h ../src/clockSetup.h \
+ ../src/ASF/sam0/drivers/sercom/sercom.h \
  ../src/ASF/sam0/drivers/system/system.h \
  ../src/ASF/sam0/drivers/system/power/power_sam_l/power.h \
  ../src/ASF/sam0/drivers/system/reset/reset_sam_l/reset.h \
@@ -173,19 +175,24 @@ src/glcd/ST7565R.d src/glcd/ST7565R.o: ../src/glcd/ST7565R.c \
  ../src/ASF/sam0/drivers/tc/tc.h \
  ../src/ASF/sam0/drivers/tc/tc_interrupt.h \
  ../src/ASF/sam0/drivers/tc/tc.h ../src/ASF/sam0/drivers/usb/usb.h \
- ../src/ASF/common/services/usb/class/cdc/usb_protocol_cdc.h \
- ../src/ASF/common/services/usb/class/cdc/device/udi_cdc.h \
+ ../src/ASF/common/services/usb/class/msc/device/udi_msc.h \
  ../src/config/conf_usb.h \
- ../src/ASF/common/services/usb/class/cdc/device/udi_cdc_conf.h \
+ ../src/ASF/common/services/usb/class/msc/device/udi_msc_conf.h \
+ ../src/ASF/common/services/usb/class/msc/device/udi_msc.h \
  ../src/ASF/common/services/usb/usb_protocol.h \
  ../src/ASF/common/services/usb/usb_atmel.h \
+ ../src/ASF/common/services/usb/class/msc/usb_protocol_msc.h \
  ../src/ASF/common/services/usb/udc/udd.h \
  ../src/ASF/common/services/usb/udc/udc_desc.h \
  ../src/ASF/common/services/usb/udc/udi.h \
  ../src/ASF/common/services/usb/udc/udc_desc.h \
  ../src/ASF/common/services/usb/udc/udi.h \
  ../src/ASF/common/services/usb/udc/udc.h \
- ../src/ASF/common/services/usb/udc/udd.h ../src/glcd/ATSAML21.h \
+ ../src/ASF/common/services/usb/udc/udd.h \
+ ../src/ASF/sam0/drivers/wdt/wdt.h \
+ ../src/ASF/sam0/drivers/wdt/wdt_callback.h \
+ ../src/ASF/sam0/drivers/wdt/wdt.h \
+ ../src/ASF/sam0/drivers/wdt/wdt_callback.h ../src/glcd/ATSAML21.h \
  ../src/glcd/ST7565R.h ../src/glcd/glcd_graphics.h \
  ../src/glcd/glcd_graphs.h ../src/glcd/glcd_text_tiny.h \
  ../src/glcd/glcd_text.h ../src/glcd/unit_tests.h
@@ -240,9 +247,11 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\lib\gc
 
 ../src/ASF/thirdparty/CMSIS/Include/core_cm0plus.h:
 
-../src/ASF/thirdparty/CMSIS/Include/core_cmInstr.h:
+../src/ASF/thirdparty/CMSIS/Include/cmsis_version.h:
 
-../src/ASF/thirdparty/CMSIS/Include/core_cmFunc.h:
+../src/ASF/thirdparty/CMSIS/Include/cmsis_compiler.h:
+
+../src/ASF/thirdparty/CMSIS/Include/cmsis_gcc.h:
 
 ../src/ASF/sam0/utils/cmsis/saml21/source/system_saml21.h:
 
@@ -494,6 +503,8 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-no
 
 ../src/config/conf_sd_mmc.h:
 
+../src/clockSetup.h:
+
 ../src/ASF/sam0/drivers/sercom/sercom.h:
 
 ../src/ASF/sam0/drivers/system/system.h:
@@ -554,17 +565,19 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-no
 
 ../src/ASF/sam0/drivers/usb/usb.h:
 
-../src/ASF/common/services/usb/class/cdc/usb_protocol_cdc.h:
-
-../src/ASF/common/services/usb/class/cdc/device/udi_cdc.h:
+../src/ASF/common/services/usb/class/msc/device/udi_msc.h:
 
 ../src/config/conf_usb.h:
 
-../src/ASF/common/services/usb/class/cdc/device/udi_cdc_conf.h:
+../src/ASF/common/services/usb/class/msc/device/udi_msc_conf.h:
+
+../src/ASF/common/services/usb/class/msc/device/udi_msc.h:
 
 ../src/ASF/common/services/usb/usb_protocol.h:
 
 ../src/ASF/common/services/usb/usb_atmel.h:
+
+../src/ASF/common/services/usb/class/msc/usb_protocol_msc.h:
 
 ../src/ASF/common/services/usb/udc/udd.h:
 
@@ -579,6 +592,14 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-no
 ../src/ASF/common/services/usb/udc/udc.h:
 
 ../src/ASF/common/services/usb/udc/udd.h:
+
+../src/ASF/sam0/drivers/wdt/wdt.h:
+
+../src/ASF/sam0/drivers/wdt/wdt_callback.h:
+
+../src/ASF/sam0/drivers/wdt/wdt.h:
+
+../src/ASF/sam0/drivers/wdt/wdt_callback.h:
 
 ../src/glcd/ATSAML21.h:
 

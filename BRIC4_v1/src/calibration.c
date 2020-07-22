@@ -153,7 +153,7 @@ FRESULT cal_write_report(void){
 	float azm_cal, inc_cal, roll_cal;
 	
 	//  Set up SD card
-	config_spi(SD_card);
+	//config_spi(SD_card);
 	spi_select_slave(&spi_main, &slave_SD, true);
 
 	diskio_status = disk_status(0);
@@ -165,7 +165,7 @@ FRESULT cal_write_report(void){
 		if(diskio_status){
 			fdebug1 = FR_NOT_READY;
 			SD_status = fdebug1;
-			config_spi(LCD);
+			//config_spi(LCD);
 			return fdebug1;
 		}
 	
@@ -178,7 +178,7 @@ FRESULT cal_write_report(void){
 	fdebug2 = f_open(&file_cal_report, file_name, FA_CREATE_NEW | FA_READ | FA_WRITE);						
 	if(fdebug2!=FR_OK){
 		SD_status = fdebug2;
-		config_spi(LCD);
+		//config_spi(LCD);
 		return fdebug2;
 	}
 	
@@ -307,7 +307,7 @@ FRESULT cal_write_report(void){
 	if(fdebug2 != FR_OK){
 		// Some other SD card error
 		SD_status = fdebug2;
-		config_spi(LCD);
+		//config_spi(LCD);
 		return fdebug2;
 	}
 	
@@ -512,13 +512,13 @@ void calc_orientation(struct MEASUREMENT *meas_inst){
 	
 }
 
-void rotvec_theta_ZY(float XYZ[3], float rotXYZ[3], float *thetaZ, float *thetaY){
+void rotvec_theta_ZY(float XYZ[3], float rotXYZ[3], float thetaZ, float thetaY){
 	float rotM[3][3];
 	float rthetaZ;
 	float rthetaY;
 	
-	rthetaZ = *thetaZ*deg2rad;
-	rthetaY = *thetaY*deg2rad;
+	rthetaZ = thetaZ*deg2rad;
+	rthetaY = thetaY*deg2rad;
 	
 	//  Rotation Matrix about Z Axis
 	rotM[0][0] = cos(rthetaZ);
@@ -546,13 +546,13 @@ void rotvec_theta_ZY(float XYZ[3], float rotXYZ[3], float *thetaZ, float *thetaY
 	
 }
 
-void rotvec_theta_XY(float XYZ[3], float rotXYZ[3], float *thetaX, float *thetaY){
+void rotvec_theta_XY(float XYZ[3], float rotXYZ[3], float thetaX, float thetaY){
 	float rotM[3][3];
 	float rthetaX;
 	float rthetaY;
 	
-	rthetaX = *thetaX*deg2rad;
-	rthetaY = *thetaY*deg2rad;
+	rthetaX = thetaX*deg2rad;
+	rthetaY = thetaY*deg2rad;
 	
 	// Product of two rotation matrixes, R(thetaX)*R(thetaY)
 	//  Rotate around X axis
@@ -608,15 +608,20 @@ void calc_azm_inc_roll_dec(float aXYZ[3], float cXYZ[3], float *azimuthP, float 
 	float thetaX, thetaY, crxy;
 	
 	//  Calculate Inclination and Roll
+	//  thetaX and thetaY are rotations of instrument relative to NED
 	calc_theta_XY( aXYZ , &thetaX, &thetaY);
 	*inclinationP = -1*thetaY;
 	*rollP = thetaX;
+	//  Roll is -180 to 180; Convert to 0-360;
+	if ((*rollP)<0){
+		*rollP = *rollP+360;
+	}
 	
 	//  Calculate Azimuth
-	rotvec_theta_XY(cXYZ, crotXYZ, &thetaX, &thetaY);
+	rotvec_theta_XY(cXYZ, crotXYZ, thetaX, thetaY);
 	*azimuthP = rad2deg*atan2(crotXYZ[1], crotXYZ[0]);
+	//  Result is -180 to +180; Compass must be 0-360
 	if ((*azimuthP)<0){
-		//  Result is -180 to +180; Compass must be 0-360
 		*azimuthP = *azimuthP+360;
 	}
 	
@@ -632,8 +637,10 @@ void calc_theta_XY(float XYZ[3], float *thetaX, float *thetaY){
 	float ryz;
 	ryz = sqrt(pow(XYZ[1],2) + pow(XYZ[2],2));
 	
-	*thetaX = rad2deg*atan2(XYZ[1], XYZ[2]) + 180;
-	*thetaY = rad2deg*atan2(XYZ[0], ryz);
+	//*thetaX = rad2deg*atan2(XYZ[1], XYZ[2]) + 180;
+	//*thetaY = rad2deg*atan2(XYZ[0], ryz);
+	*thetaX = rad2deg*atan2(XYZ[1], XYZ[2]);
+	*thetaY = -1*rad2deg*atan2(XYZ[0], ryz);
 	
 }
 
@@ -916,8 +923,7 @@ void cal_apply_cal(float uncalXYZ[3], float calXYZ[3], struct INST_CAL *cal_stru
 
 
 	//  Apply rotation calibration
-
-	//Rotate vector by rotation matrix
+	//  Rotate vector by rotation matrix
 	mat_mult_33_31(cal_struct->RotM, calXYZ, calXYZ);
 	
 }

@@ -36,11 +36,13 @@
 
 /* Includes from CMSIS and Peripheral Library */
 #include <asf.h>
+#include <comms\comms.h>
 
 /* Includes from GLCD */
 #include "glcd.h"
+//#include "comms/comms.h"
 
-extern struct spi_module spi_main;
+//extern struct spi_module spi_main;
 
 //void delay_ms(uint32_t ms);
 
@@ -71,24 +73,31 @@ void glcd_init(void)
 
 void glcd_spi_write(uint8_t c)
 {
-	//uint8_t temp;
+	static uint8_t temp;
+	static uint16_t length=1;
 
-	GLCD_SELECT();
+	//GLCD_SELECT();
+	
+	spi_select_slave(&spi_main, &slave_lcd, true);
+	//spi_transceive_buffer_wait(&spi_main, &c, &temp, length);
+	//spi_write_buffer_wait(&spi_main, &c, 1);
+	spi_transceive_wait(&spi_main, c, &temp);
+	spi_select_slave(&spi_main, &slave_lcd, false);
 	/*!< Loop while DR register in not empty */
 	//while (SPI_I2S_GetFlagStatus(SPIx, SPI_I2S_FLAG_TXE) == RESET);
-	while(spi_is_ready_to_write(&spi_main)==false);
+	//while(spi_is_ready_to_write(&spi_main)==false);//Kfausnight 20200613
 	
 	
 	//SPI_I2S_SendData(SPIx, (uint16_t) c);
-	spi_write(&spi_main, c);
+	//spi_write(&spi_main, c);//Kfausnight 20200613
 	
 	/* Wait until entire byte has been read (which we discard anyway) */
 	//while(SPI_I2S_GetFlagStatus(SPIx, SPI_I2S_FLAG_BSY) != RESET);
-	while(spi_is_write_complete(&spi_main)==false);
+	//while(spi_is_write_complete(&spi_main)==false);//Kfausnight 20200613
 
 	//temp = SPI_I2S_ReceiveData(SPIx);
 
-	GLCD_DESELECT();
+	//GLCD_DESELECT();
 }
 
 void glcd_reset(void)

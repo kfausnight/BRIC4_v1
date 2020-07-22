@@ -32,11 +32,14 @@
 	SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <asf.h>
+
 
 
 #ifndef ATSAML21_H_
 #define ATSAML21_H_
+
+#include <asf.h>
+#include <comms\comms.h>
 
 
 #define CONTROLLER_SPI_SS_PIN   IOPORT_CREATE_PIN(IOPORT_PORTA, 23)

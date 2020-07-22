@@ -39,7 +39,7 @@ uint8_t cmd_beep_off[6]=		{0xAA, 0x00, 0x47, 0x00, 0x48, 0xA8};
 extern float rad2deg, deg2rad, mt2ft;//  Conversion factor meters to feet, degrees to radians
 extern struct INST_CAL a1_calst, a2_calst, c1_calst, c2_calst, dist_calst;
 extern volatile bool laser_triggered;
-#define max_samples 100 //  Maximum samples to collect before error
+#define timeOutMs 5000 //  When taking a measurement, wait this long for laser data to arrive back
 extern struct OPTIONS options;
 
 
@@ -63,14 +63,22 @@ float calc_magnitude(float xyz[3]){
 void quick_measurement(struct MEASUREMENT *meas_inst){
 
 	
-	config_spi(sensors);
+	//config_spi(sensors);
 	
 	read_accel(&slave_acc1, meas_inst->a1xyz);
 	read_accel(&slave_acc2, meas_inst->a2xyz);
 	read_mag(&slave_mag1, meas_inst->c1xyz);
 	read_mag(&slave_mag2, meas_inst->c2xyz);
-	config_spi(LCD);
+	//config_spi(LCD);
 	
+	//  Calibrate Results
+	cal_apply_cal(meas_inst->a1xyz, meas_inst->a1xyz, &a1_calst);
+	cal_apply_cal(meas_inst->a2xyz, meas_inst->a2xyz, &a2_calst);
+	cal_apply_cal(meas_inst->c1xyz, meas_inst->c1xyz, &c1_calst);
+	cal_apply_cal(meas_inst->c2xyz, meas_inst->c2xyz, &c2_calst);
+		
+
+	//  Calculate instrument inclination, roll, azimuth, declination
 	calc_orientation(meas_inst);
 		
 }
@@ -82,6 +90,7 @@ void quick_measurement(struct MEASUREMENT *meas_inst){
 
 void full_measurement(struct MEASUREMENT *meas_inst, bool calibrate_data){
 	uint8_t i;
+	uint32_t refMs1;
 	enum LASER_MESSAGE_TYPE debugLM;
 	float a1temp[3], a2temp[3], c1temp[3], c2temp[3];
 	
@@ -94,7 +103,7 @@ void full_measurement(struct MEASUREMENT *meas_inst, bool calibrate_data){
 	backlightOff();
 	
 	//  Configure SPI to talk to sensors
-	config_spi(sensors);
+	//config_spi(sensors);
 		
 	// Initialize structure
 	for (i=0;i<3;i++){
@@ -109,6 +118,7 @@ void full_measurement(struct MEASUREMENT *meas_inst, bool calibrate_data){
 	//Initiate Laser Measurement	
 	rxBufferLaserClear();
 	writeLaser(cmd_laser_single, sizeof(cmd_laser_single));
+	refMs1 = rtc_count_get_count(&rtc1); //  Background clock running at 1000hz
 	while(1){
 		//Take measurements while laser is responding
 		read_accel(&slave_acc1,a1temp);
@@ -123,7 +133,9 @@ void full_measurement(struct MEASUREMENT *meas_inst, bool calibrate_data){
 		}
 		meas_inst->samples += 1;
 		
-		if (meas_inst->samples > max_samples){
+		meas_inst->readTimeMs = rtc_count_get_count(&rtc1)-refMs1;
+		//deltaMs = rtc_count_get_count(&rtc1)-refMs1; //  Background clock running at 1000hz
+		if (meas_inst->readTimeMs > timeOutMs){
 			//usart_abort_job(&usart_laser, USART_TRANSCEIVER_RX);
 			break;
 		}
@@ -188,7 +200,7 @@ void full_measurement(struct MEASUREMENT *meas_inst, bool calibrate_data){
 	//  Turn backlight back on
 	backlightOn();
 	//  Configure SPI to speak to LCD	
-	config_spi(LCD);	
+	//config_spi(LCD);	
 }
 
 
@@ -235,7 +247,7 @@ void laser_parse_buffer(struct MEASUREMENT *meas_inst){
 		increment_error_count(meas_inst);
 		meas_inst->distance = 0;
 		return;
-	}else if(meas_inst->samples > max_samples){//timeout error
+	}else if(meas_inst->readTimeMs > timeOutMs){//timeout error
 		meas_inst->measurement_error[meas_inst->num_errors] = laser_response_timeout;
 		meas_inst->measurement_error_data1[meas_inst->num_errors] = meas_inst->samples;
 		increment_error_count(meas_inst);
@@ -335,43 +347,52 @@ void laser_on_off(bool on_off){
 
 
 void read_accel(struct spi_slave_inst *const sensor, float vector[3]){
-	uint8_t read_buffer[4];
+	#define accelMessLength	4
+	static uint16_t length = accelMessLength;
+	uint8_t read_buffer[accelMessLength];
+	float tempV[3];
 	uint8_t i;
-	float temp;
+	
 	//select acc1 chip
 	// Assumes SPI already setup for sensors
 	spi_select_slave(&spi_main, sensor, true);
-	//clear out receive buffer
-	spi_clear();
+
+
 	//Send Read X command
-	spi_transceive_buffer_wait(&spi_main, read_x, read_buffer, 4);
+	spi_transceive_buffer_wait(&spi_main, read_x, read_buffer, length);
 	spi_select_slave(&spi_main, sensor, false);
 	//Send Read Y command, Read X
 	spi_select_slave(&spi_main, sensor, true);
-	spi_transceive_buffer_wait(&spi_main, read_y, read_buffer, 4);
+	spi_transceive_buffer_wait(&spi_main, read_y, read_buffer, length);
 	spi_select_slave(&spi_main, sensor, false);
 	//Parse X data
-	vector[0]=parse_acc_data(read_buffer);
+	tempV[0]=parse_acc_data(read_buffer);
 	//Send Read Z command, Read Y
 	spi_select_slave(&spi_main, sensor, true);
-	spi_transceive_buffer_wait(&spi_main, read_z, read_buffer, 4);
+	spi_transceive_buffer_wait(&spi_main, read_z, read_buffer, length);
 	spi_select_slave(&spi_main, sensor, false);
 	//Parse Y data
-	vector[1]=parse_acc_data(read_buffer);
+	tempV[1]=parse_acc_data(read_buffer);
 	//Send read status command (not used), read Z
 	spi_select_slave(&spi_main, sensor, true);
-	spi_transceive_buffer_wait(&spi_main, read_status, read_buffer, 4);
+	spi_transceive_buffer_wait(&spi_main, read_status, read_buffer, length);
 	spi_select_slave(&spi_main, sensor, false);
 	//Parse Z data
-	vector[2]=parse_acc_data(read_buffer);
-	//Correct for sensor orientation
-	temp=vector[1];
-	vector[1]=vector[0];
-	vector[0]=-1*temp;
+	tempV[2]=parse_acc_data(read_buffer);
 	
 	for (i=0;i<3;i++){
-		vector[i] = vector[i]/a_coarse_gain;
+		tempV[i] = tempV[i]/a_coarse_gain;
 	}
+	
+	//Correct for sensor orientation
+	vector[0] = tempV[1];
+	vector[1] = -1*tempV[0];
+	vector[2] = -1*tempV[2];
+	//temp=vector[1];
+	//vector[1]=vector[0];
+	//vector[0]=-1*temp;
+	
+	
 	
 	
 }
@@ -394,10 +415,9 @@ void setup_accel(struct spi_slave_inst *const sensor){
 	uint8_t read_buffer[4];
 	
 	//select acc1 chip
-	config_spi(sensors);
+	//config_spi(sensors);
 	
 	spi_select_slave(&spi_main, sensor, true);
-	spi_clear();
 	//sw reset
 	spi_transceive_buffer_wait(&spi_main, sw_reset, read_buffer, 4);
 	//toggle CS line
@@ -408,7 +428,7 @@ void setup_accel(struct spi_slave_inst *const sensor){
 	spi_transceive_buffer_wait(&spi_main, set_mode4, read_buffer, 4);
 	//toggle CS line
 	spi_select_slave(&spi_main, sensor, false);
-	config_spi(LCD);
+	//config_spi(LCD);
 	
 }
 
@@ -424,7 +444,7 @@ uint8_t read_mag(struct spi_slave_inst *const sensor, float vector[3]){
 	//select sensor
 	// Assumes SPI already set up for sensors
 	spi_select_slave(&spi_main, sensor, true);
-	spi_clear();
+
 	//Send Send Poll command to 0x00
 	write_buffer[0]=0x00; //poll register
 	write_buffer[1]=0x70; //set to poll X,Y,Z
@@ -452,6 +472,7 @@ uint8_t read_mag(struct spi_slave_inst *const sensor, float vector[3]){
 	spi_select_slave(&spi_main, sensor, false);
 	delay_us(1);
 	
+	//  Assign readings to axis
 	vector[0]=parse_mag_data(&read_buffer[0]);
 	vector[1]=parse_mag_data(&read_buffer[3]);
 	vector[2]=-1* parse_mag_data(&read_buffer[6]);//Z axis inverted
@@ -482,9 +503,9 @@ float parse_mag_data(uint8_t data[3]){
 void setup_mag(struct spi_slave_inst *const sensor){
 	uint8_t write_buffer[7];
 	//select sensor
-	config_spi(sensors);
+	//config_spi(sensors);
 	spi_select_slave(&spi_main, sensor, true);
-	spi_clear();
+
 	//Set cycle count registers
 	write_buffer[0]=0x04;//location of first write count register
 	write_buffer[1]=cycle_count1;
@@ -516,7 +537,7 @@ void setup_mag(struct spi_slave_inst *const sensor){
 	spi_select_slave(&spi_main, sensor, true);
 	spi_write_buffer_wait(&spi_main, write_buffer, 2);
 	spi_select_slave(&spi_main, sensor, false);
-	config_spi(LCD);
+	//config_spi(LCD);
 }
 
 

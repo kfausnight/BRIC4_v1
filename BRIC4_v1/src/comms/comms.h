@@ -9,6 +9,7 @@
 #define COMMS_H_
 
 #include <asf.h>
+#include <clockSetup.h>
 
 #define lcd_SS	IOPORT_CREATE_PIN(IOPORT_PORTA, 23)//CS6
 #define acc1_SS	IOPORT_CREATE_PIN(IOPORT_PORTA, 18)//CS1
@@ -29,7 +30,12 @@
 #define miso	IOPORT_CREATE_PIN(IOPORT_PORTB, 8)//SPI MISO
 #define sclk	IOPORT_CREATE_PIN(IOPORT_PORTB, 11)//SPI SCLK
 
-
+//  SPI Max Baud Rates
+#define baudMaxBL652	 4000000
+#define baudMaxSD		10000000
+#define baudMaxDisp		 2500000
+#define baudMaxAcc		 2500000
+#define baudMaxComp		 2500000//  Could not find in datasheet
 
 
 enum read_write {readp, writep};
@@ -40,7 +46,7 @@ void disable_comms(void);
 
 // SPI setup
 void setup_spi(void);
-void config_spi(enum spi_device);
+//void config_spi(enum spi_device);
 struct spi_module spi_main; //Master software module
 struct spi_config config_spi_master;//  Master configuration
 struct spi_slave_inst	slave_lcd;
@@ -49,7 +55,11 @@ struct spi_slave_inst	slave_acc2;
 struct spi_slave_inst	slave_mag1;
 struct spi_slave_inst	slave_mag2;
 struct spi_slave_inst	slave_SD;
-void spi_clear(void);
+
+//void configure_spi_master_callbacks(void);
+//static void callback_spi_master( struct spi_module *const );
+//bool isSpiTransrevComplete(void);
+//void resetSpiTransrevComplete(void);
 
 //USART
 enum LASER_MESSAGE_TYPE{
@@ -69,6 +79,8 @@ enum LASER_MESSAGE_TYPE{
 
 volatile uint8_t rxBufferLaser[20];
 volatile uint8_t rxBufferLaserIndex;
+volatile uint8_t rxBufferSpi[100];
+volatile uint8_t rxBufferSpiIndex;
 volatile uint8_t debugBuffer[200];
 volatile uint8_t debugBufferIndex;
 enum LASER_MESSAGE_TYPE laserMessageType(void);

@@ -13,9 +13,9 @@
 #include <stdint.h>
 #include <sensors.h>
 #include <math.h>
-#include "FatFS_R13C\ff.h"
-#include "FatFS_R13C\diskio.h"
-#include <extern_clock\extern_clock.h>
+//#include "FatFS_R13C\ff.h"
+//#include "FatFS_R13C\diskio.h"
+#include <clockSetup.h>
 
 #define nbuf		80
 #define group_size	4// For Azm/Inc calibration
@@ -76,8 +76,8 @@ void transpose(float [][6], float [][6], float [][6], uint8_t);
 float determinant(float [][6], uint8_t);
 void calc_theta_XY(float [3], float *, float *);
 void calc_azm_inc_roll_dec(float [3], float [3], float *, float *, float *, float *);
-void rotvec_theta_ZY(float [3], float [3], float *, float *);
-void rotvec_theta_XY(float [3], float [3], float *, float *);
+void rotvec_theta_ZY(float [3], float [3], float, float);
+void rotvec_theta_XY(float [3], float [3], float, float);
 float stdev(float [], uint32_t);
 float calc_mag_stdev(float [][3]);
 float calc_disp_stdev(float [][3], float [][3], uint8_t);

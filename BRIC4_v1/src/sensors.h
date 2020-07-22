@@ -15,7 +15,7 @@
 #include <asf.h>
 #include <comms/comms.h>
 #include <calibration.h>
-#include <extern_clock\extern_clock.h>
+#include <clockSetup.h>
 #include <timers.h>
 #include <math.h>
 
@@ -52,6 +52,8 @@ struct MEASUREMENT{
 	uint32_t samples;
 	unit_type distance_units;
 	unit_type temp_units;
+	//  Time to take measurement
+	uint32_t readTimeMs;	
 	//  Measurement Error Data
 	uint32_t num_errors;
 	enum measurement_error_type measurement_error[max_errors];

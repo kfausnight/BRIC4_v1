@@ -3,60 +3,44 @@
  *
  * \brief SD/MMC stack configuration file.
  *
- * Copyright (c) 2014-2015 Atmel Corporation. All rights reserved.
+ * Copyright (c) 2014-2018 Microchip Technology Inc. and its subsidiaries.
  *
  * \asf_license_start
  *
  * \page License
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
+ * Subject to your compliance with these terms, you may use Microchip
+ * software and any derivatives exclusively with Microchip products.
+ * It is your responsibility to comply with third party license terms applicable
+ * to your use of third party software (including open source software) that
+ * may accompany Microchip software.
  *
- * 1. Redistributions of source code must retain the above copyright notice,
- *    this list of conditions and the following disclaimer.
- *
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
- *
- * 3. The name of Atmel may not be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * 4. This software may only be redistributed and used in connection with an
- *    Atmel microcontroller product.
- *
- * THIS SOFTWARE IS PROVIDED BY ATMEL "AS IS" AND ANY EXPRESS OR IMPLIED
- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT ARE
- * EXPRESSLY AND SPECIFICALLY DISCLAIMED. IN NO EVENT SHALL ATMEL BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
- * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
- * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * THIS SOFTWARE IS SUPPLIED BY MICROCHIP "AS IS". NO WARRANTIES,
+ * WHETHER EXPRESS, IMPLIED OR STATUTORY, APPLY TO THIS SOFTWARE,
+ * INCLUDING ANY IMPLIED WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY,
+ * AND FITNESS FOR A PARTICULAR PURPOSE. IN NO EVENT WILL MICROCHIP BE
+ * LIABLE FOR ANY INDIRECT, SPECIAL, PUNITIVE, INCIDENTAL OR CONSEQUENTIAL
+ * LOSS, DAMAGE, COST OR EXPENSE OF ANY KIND WHATSOEVER RELATED TO THE
+ * SOFTWARE, HOWEVER CAUSED, EVEN IF MICROCHIP HAS BEEN ADVISED OF THE
+ * POSSIBILITY OR THE DAMAGES ARE FORESEEABLE.  TO THE FULLEST EXTENT
+ * ALLOWED BY LAW, MICROCHIP'S TOTAL LIABILITY ON ALL CLAIMS IN ANY WAY
+ * RELATED TO THIS SOFTWARE WILL NOT EXCEED THE AMOUNT OF FEES, IF ANY,
+ * THAT YOU HAVE PAID DIRECTLY TO MICROCHIP FOR THIS SOFTWARE.
  *
  * \asf_license_stop
  *
  */
 /*
- * Support and FAQ: visit <a href="http://www.atmel.com/design-support/">Atmel Support</a>
+ * Support and FAQ: visit <a href="https://www.microchip.com/support/">Microchip Support</a>
  */
-#include <asf.h>
-
-//#include "comms\comms.h"
-
-//#define SD_CS		IOPORT_CREATE_PIN(IOPORT_PORTB, 3)//  Edited out Kfausnight 20200416
 
 #ifndef CONF_SD_MMC_H_INCLUDED
 #define CONF_SD_MMC_H_INCLUDED
 
+#include <clockSetup.h>//  Kfausnight 4/26/2020
+
 /* Define to enable the SPI mode instead of Multimedia Card interface mode */
 #define SD_MMC_SPI_MODE
-
-//Add for debug
-//#define SD_MMC_ENABLE //  Kfausnight 4/22/2020
 
 /* Define to enable the SDIO support */
 //#define SDIO_SUPPORT_ENABLE
@@ -68,8 +52,7 @@
 #define SD_MMC_SPI_MEM_CNT          1
 
 /* Select the SPI module SD/MMC is connected to */
-/*
-#ifdef EXT1_SPI_MODULE 
+#ifdef EXT1_SPI_MODULE /* Default configuration for Xplained Pro kit */
 #  define SD_MMC_SPI                 EXT1_SPI_MODULE
 #  define SD_MMC_SPI_PINMUX_SETTING  EXT1_SPI_SERCOM_MUX_SETTING
 #  define SD_MMC_SPI_PINMUX_PAD0     EXT1_SPI_SERCOM_PINMUX_PAD0
@@ -81,9 +64,9 @@
 
 #  define SD_MMC_0_CD_GPIO           (EXT1_PIN_10)
 #  define SD_MMC_0_CD_DETECT_VALUE   0
-#else 
-*/
-#  define SD_CS	IOPORT_CREATE_PIN(IOPORT_PORTA, 15)//CS7
+#else /* Dummy configuration */
+//  Edited Kfausnight 4/26/2020
+#  define SD_CS						IOPORT_CREATE_PIN(IOPORT_PORTA, 15)//CS7
 #  define SD_MMC_SPI                 SERCOM4
 #  define SD_MMC_SPI_PINMUX_SETTING  SPI_SIGNAL_MUX_SETTING_E
 #  define SD_MMC_SPI_PINMUX_PAD0     PINMUX_PB08D_SERCOM4_PAD0
@@ -93,15 +76,19 @@
 
 #  define SD_MMC_CS                  SD_CS
 
-//#  define SD_MMC_0_CD_GPIO           (SD_CS)
-//#  define SD_MMC_0_CD_DETECT_VALUE   1
-
+//#  define SD_MMC_0_CD_GPIO           0
+//#  define SD_MMC_0_CD_DETECT_VALUE   0
+//  End edit Kfausnight 4/26/2020
+#endif
 
 /* Define the SPI clock source */
-#define SD_MMC_SPI_SOURCE_CLOCK    GCLK_GENERATOR_0
+#define SD_MMC_SPI_SOURCE_CLOCK    GCLK_FOR_SPI // Kfausnight 4/26/2020
 
 /* Define the SPI max clock */
-#define SD_MMC_SPI_MAX_CLOCK       4000000
+//#define SD_MMC_SPI_MAX_CLOCK       1000000
+//#define SD_MMC_SPI_MAX_CLOCK       10000000
+#define SD_MMC_SPI_MAX_CLOCK        2500000
+//#define SD_MMC_SPI_MAX_CLOCK       24000000
 
 #endif /* CONF_SD_MMC_H_INCLUDED */
 

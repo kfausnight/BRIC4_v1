@@ -13,6 +13,8 @@ volatile bool LaserTransmitComplete;
 volatile bool LaserReceiveComplete;
 volatile enum LASER_MESSAGE_TYPE laserCurrentMessage;
 
+volatile bool spiReceiveComplete;
+
 
 //Disable
 void disable_comms(void){
@@ -27,15 +29,22 @@ void disable_comms(void){
 
 //SPI
 //***************************************
+//bool isSpiTransrevComplete(void){
+//	return spiReceiveComplete;	
+//}
+//void resetSpiTransrevComplete(void){
+//	spiReceiveComplete = false;
+//}
 
 void setup_spi(void){
-	uint8_t *reg_ptr;
+	//  Maximum Speed LCD:  2.5 MHz
+	//uint8_t *reg_ptr;
 	
 	struct spi_slave_inst_config slave_dev_config;
 	
 	// Set buffer-overflow status to display immediately so it can be cleared:
-	reg_ptr=0x42001001;
-	*reg_ptr=0x01;
+	//reg_ptr=0x42001001;
+	//*reg_ptr=0x01;
 	// Configure and initialize software device instance of peripheral slave
 	spi_slave_inst_get_config_defaults(&slave_dev_config);
 	slave_dev_config.ss_pin = lcd_SS;
@@ -52,16 +61,18 @@ void setup_spi(void){
 	spi_attach_slave(&slave_SD, &slave_dev_config);
 	// Configure, initialize and enable SERCOM SPI module
 	spi_get_config_defaults(&config_spi_master);
-	config_spi_master.transfer_mode = SPI_TRANSFER_MODE_3;//initialize with LCD mode
+	config_spi_master.generator_source = GCLK_FOR_SPI;
+	//config_spi_master.transfer_mode = SPI_TRANSFER_MODE_3;//initialize with LCD mode
+	config_spi_master.transfer_mode = SPI_TRANSFER_MODE_0;//initialize with LCD mode
 	config_spi_master.mux_setting = SPI_SIGNAL_MUX_SETTING_E;
 	config_spi_master.pinmux_pad0 = PINMUX_PB08D_SERCOM4_PAD0;
 	config_spi_master.pinmux_pad2 = PINMUX_PB10D_SERCOM4_PAD2;
 	config_spi_master.pinmux_pad3 = PINMUX_PB11D_SERCOM4_PAD3;
 	config_spi_master.character_size = SPI_CHARACTER_SIZE_8BIT ;
+	config_spi_master.mode_specific.master.baudrate = baudMaxAcc;
 	spi_init(&spi_main, SERCOM4, &config_spi_master);
 	spi_enable(&spi_main);
-	//ioport_set_pin_mode(miso, IOPORT_MODE_PULLUP);
-	//ioport_set_pin_mode(sclk, IOPORT_MODE_PULLUP);
+
 	
 }
 
@@ -70,17 +81,19 @@ void setup_spi(void){
 
 
 
+/*
 void config_spi(enum spi_device SPI_DEVICE){
-	uint8_t *ptr_POL;
+	static uint8_t *ptr_POL = 0x42001003;
 	//uint8_t *ptr_CTRLA,
 
 	//ptr_CTRLA=0x42001000;//  CTRLA byte 1 register
-	ptr_POL  =0x42001003;//  SPI polarity register
+	//ptr_POL  =0x42001003;//  SPI polarity register
 	spi_disable(&spi_main);
 	switch (SPI_DEVICE)
 	{
 		case LCD:
-			*ptr_POL = 0b00110000;
+			*ptr_POL = 0b00000000;//debug
+			
 			break;
 		case sensors:
 			*ptr_POL = 0b00000000;
@@ -95,20 +108,9 @@ void config_spi(enum spi_device SPI_DEVICE){
 	spi_enable(&spi_main);
 
 }
+*/
 
 
-
-
-void spi_clear(void){
-	
-	uint8_t *reg_ptr;
-	uint8_t read_buffer[4];
-	//clear out receive buffer
-	while(spi_is_ready_to_read(&spi_main)){	spi_read(&spi_main, read_buffer);	}
-	//Clear overflow error bit:
-	reg_ptr=0x4200101A;
-	*reg_ptr=0x01;
-}
 
 
 
@@ -121,6 +123,7 @@ void configure_usart(void){
 	
 	//  Laser UART setup SERCOM1
 	usart_get_config_defaults(&config_usart);
+	config_usart.generator_source = GCLK_FOR_USART_LASER;
 	config_usart.baudrate    = 9600;
 	config_usart.mux_setting = USART_RX_1_TX_0_XCK_1;
 	config_usart.pinmux_pad0 = PINMUX_PA16C_SERCOM1_PAD0;
@@ -134,6 +137,7 @@ void configure_usart(void){
 	
 	// BLE UART setup SERCOM0
 	usart_get_config_defaults(&config_usart);
+	config_usart.generator_source = GCLK_FOR_USART_BLE;
 	config_usart.baudrate    = 115200;
 	config_usart.mux_setting = USART_RX_1_TX_0_RTS_2_CTS_3;
 	config_usart.pinmux_pad0 = PINMUX_PA08C_SERCOM0_PAD0;
@@ -215,21 +219,6 @@ enum status_code writeLaser(uint8_t *tx_data, uint16_t length){
 }
 	
 	
-enum status_code readLaser(){
-	enum status_code readStatus;
-	//clear_rx_buffer();
-	//LaserReceiveComplete = false;
-	//Length of returned message is unknown
-	//usart_abort_job(&usart_laser, USART_TRANSCEIVER_RX);
-	//while(laserReadStatus());
-	//usart_abort_job(&usart_laser, USART_TRANSCEIVER_RX);
-	//clear_rx_buffer();
-	LaserReceiveComplete = false;
-	//rxBufferLaserIndex = 0;
-	//readStatus = usart_read_job(&usart_laser, rxBufferLaser); // 
-	//usart_read_job(&usart_laser, &rx_buffer[rx_buffer_index]);
-	return readStatus;
-};
 
 bool isLaserTransmitComplete(void){
 	return LaserTransmitComplete;
@@ -251,12 +240,15 @@ void rxBufferLaserClear(void){
 //  Determine the type of message currently in the buffer
 enum LASER_MESSAGE_TYPE laserMessageType(void){
 	uint8_t i;
+	enum LASER_MESSAGE_TYPE messType = 0;
 	for(i=0;i<sizeof(rxBufferLaser);i++){
 		if(rxBufferLaser[i]==0xAA){
-			return rxBufferLaser[i+2];
+			messType =  rxBufferLaser[i+2];
+			break;
 		}
 		
 	}
+	return messType;
 };
 
 
@@ -269,12 +261,10 @@ void configure_i2c_master(void)
 	struct i2c_master_config config_i2c_master;
 	i2c_master_get_config_defaults(&config_i2c_master);
 	/* Change buffer timeout to something longer. */
+	config_i2c_master.generator_source = GCLK_FOR_I2C;
 	config_i2c_master.buffer_timeout = 10000;
-	//#if SAMR30
 	config_i2c_master.pinmux_pad0    = PINMUX_PA12C_SERCOM2_PAD0;
 	config_i2c_master.pinmux_pad1    = PINMUX_PA13C_SERCOM2_PAD1;
-	//#endif
-	/* Initialize and enable device with config. */
 	i2c_master_init(&i2c_master_instance, SERCOM2, &config_i2c_master);
 	i2c_master_enable(&i2c_master_instance);
 }

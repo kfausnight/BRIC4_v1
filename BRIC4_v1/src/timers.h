@@ -12,31 +12,33 @@
 #include <asf.h>
 #include <main.h>
 #include <sensors.h>
+#include <clockSetup.h>
+#include <clock.h>
 
-//extern enum state_type;
-//extern enum input_type;
 
+//  RTC Functions
+void setup_rtc(void);
+void rtc_overflow_callback(void);
+void configure_rtc_callbacks(void);
+//WDT Functions
+void wdt_enable(void);
+void wdt_disable(void);
+//  TC Functions
 void configure_timers(enum STATE);
-
-
-
 void timer_callback_longbutton(struct tc_module *const);
 void timer_callback_laser_timeout(struct tc_module *const);
 void timer_callback_1s(struct tc_module *const );
-void timer_callback_quick3(struct tc_module *const );
 void configure_timer_1s(void);
 void configure_timer_laser_timeout(void);
 void configure_timer_longbutton(void);
-void configure_timer_quick3(void);
 void laser_timeout_timer(bool);
-void quick3_timer(bool);
 void idle_timeout(void);
-void wdt_enable(void);
-void wdt_disable(void);
+
+
 struct tc_module timer1;//External button long press timer
 struct tc_module timer2; //1 second refresh timer
 struct tc_module timer3; //aim timeout for laser
-
+struct rtc_module rtc1;
 
 
 

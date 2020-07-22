@@ -3,45 +3,35 @@
  *
  * \brief USB Device wrapper layer for compliance with common driver UDD
  *
- * Copyright (C) 2014-2016 Atmel Corporation. All rights reserved.
+ * Copyright (c) 2014-2018 Microchip Technology Inc. and its subsidiaries.
  *
  * \asf_license_start
  *
  * \page License
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
+ * Subject to your compliance with these terms, you may use Microchip
+ * software and any derivatives exclusively with Microchip products.
+ * It is your responsibility to comply with third party license terms applicable
+ * to your use of third party software (including open source software) that
+ * may accompany Microchip software.
  *
- * 1. Redistributions of source code must retain the above copyright notice,
- *    this list of conditions and the following disclaimer.
- *
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
- *
- * 3. The name of Atmel may not be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * 4. This software may only be redistributed and used in connection with an
- *    Atmel microcontroller product.
- *
- * THIS SOFTWARE IS PROVIDED BY ATMEL "AS IS" AND ANY EXPRESS OR IMPLIED
- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT ARE
- * EXPRESSLY AND SPECIFICALLY DISCLAIMED. IN NO EVENT SHALL ATMEL BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
- * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
- * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * THIS SOFTWARE IS SUPPLIED BY MICROCHIP "AS IS". NO WARRANTIES,
+ * WHETHER EXPRESS, IMPLIED OR STATUTORY, APPLY TO THIS SOFTWARE,
+ * INCLUDING ANY IMPLIED WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY,
+ * AND FITNESS FOR A PARTICULAR PURPOSE. IN NO EVENT WILL MICROCHIP BE
+ * LIABLE FOR ANY INDIRECT, SPECIAL, PUNITIVE, INCIDENTAL OR CONSEQUENTIAL
+ * LOSS, DAMAGE, COST OR EXPENSE OF ANY KIND WHATSOEVER RELATED TO THE
+ * SOFTWARE, HOWEVER CAUSED, EVEN IF MICROCHIP HAS BEEN ADVISED OF THE
+ * POSSIBILITY OR THE DAMAGES ARE FORESEEABLE.  TO THE FULLEST EXTENT
+ * ALLOWED BY LAW, MICROCHIP'S TOTAL LIABILITY ON ALL CLAIMS IN ANY WAY
+ * RELATED TO THIS SOFTWARE WILL NOT EXCEED THE AMOUNT OF FEES, IF ANY,
+ * THAT YOU HAVE PAID DIRECTLY TO MICROCHIP FOR THIS SOFTWARE.
  *
  * \asf_license_stop
  *
  */
 /*
- * Support and FAQ: visit <a href="http://www.atmel.com/design-support/">Atmel Support</a>
+ * Support and FAQ: visit <a href="https://www.microchip.com/support/">Microchip Support</a>
  */
 #include <string.h>
 #include <stdlib.h>
@@ -64,8 +54,8 @@
 #  error The High speed mode is not supported on this part, please remove USB_DEVICE_HS_SUPPORT in conf_usb.h
 #endif
 
-#if !(SAMD21) && !(SAMR21) && !(SAMD11) && !(SAML21) && !(SAML22) && !(SAMDA1) && !(SAMR30)
-# error The current USB Device Driver supports only SAMD21/R21/D11/L21/L22/DA1
+#if !(SAMD21) && !(SAMR21) && !(SAMD11) && !(SAML21) && !(SAML22) && !(SAMDA1) && !(SAMR30) && !(SAMR34)
+# error The current USB Device Driver supports only SAMD21/R21/D11/L21/L22/DA1/R34
 #endif
 
 #ifndef UDC_REMOTEWAKEUP_LPM_ENABLE
@@ -97,7 +87,7 @@ struct usb_module usb_device;
  * @{
  */
 #ifndef UDD_CLOCK_GEN
-#if (SAML21) || (SAML22) || (SAMR30)
+#if (SAML21) || (SAML22) || (SAMR30) || (SAMR34)
 #  define UDD_CLOCK_GEN      GCLK_GENERATOR_3
 #elif (SAMDA1)
 #  define UDD_CLOCK_GEN      GCLK_GENERATOR_1
@@ -112,7 +102,7 @@ static inline void udd_wait_clock_ready(void)
 {
 
 	if (UDD_CLOCK_SOURCE == SYSTEM_CLOCK_SOURCE_DPLL) {
-#if (SAML21) || (SAML22) || (SAMR30)
+#if (SAML21) || (SAML22) || (SAMR30) || (SAMR34)
 	#define DPLL_READY_FLAG (OSCCTRL_DPLLSTATUS_CLKRDY | OSCCTRL_DPLLSTATUS_LOCK)
 
 		while((OSCCTRL->DPLLSTATUS.reg & DPLL_READY_FLAG) != DPLL_READY_FLAG);
@@ -126,7 +116,7 @@ static inline void udd_wait_clock_ready(void)
 #endif
 
 	if (UDD_CLOCK_SOURCE == SYSTEM_CLOCK_SOURCE_DFLL) {
-#if (SAML21) || (SAML22) || (SAMR30)
+#if (SAML21) || (SAML22) || (SAMR30) || (SAMR34)
 #define DFLL_READY_FLAG (OSCCTRL_STATUS_DFLLRDY | \
 		OSCCTRL_STATUS_DFLLLCKF | OSCCTRL_STATUS_DFLLLCKC)
 
@@ -176,7 +166,7 @@ static void udd_sleep_mode(enum udd_usb_state_enum new_state)
 {
 	enum sleepmgr_mode sleep_mode[] = {
 		SLEEPMGR_ACTIVE,  /* UDD_STATE_OFF (not used) */
-	#if (SAML21) || (SAML22) || (SAMR30)
+	#if (SAML21) || (SAML22) || (SAMR30) || (SAMR34)
 		SLEEPMGR_IDLE,  /* UDD_STATE_SUSPEND */
 		SLEEPMGR_IDLE,  /* UDD_STATE_SUSPEND_LPM */
 		SLEEPMGR_IDLE,  /* UDD_STATE_IDLE */
@@ -470,7 +460,7 @@ void udd_ep_abort(udd_ep_id_t ep)
 
 bool udd_is_high_speed(void)
 {
-#if SAMD21 || SAMR21 || SAMD11 || SAML21  || SAML22 || SAMDA1 || SAMR30
+#if SAMD21 || SAMR21 || SAMD11 || SAML21  || SAML22 || SAMDA1 || SAMR30 || (SAMR34)
 	return false;
 #endif
 }
@@ -1271,7 +1261,7 @@ void udd_disable(void)
 
 	udd_detach();
 
-	udd_sleep_mode(UDD_STATE_OFF);
+	//udd_sleep_mode(UDD_STATE_OFF);
 
 	flags = cpu_irq_save();
 	usb_dual_disable();

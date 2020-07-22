@@ -47,4 +47,7 @@
 #ifndef CONF_BOARD_H
 #define CONF_BOARD_H
 
+#define CONF_BOARD_USB_PORT// Added Kfausnight 4/25/2020
+
+
 #endif // CONF_BOARD_H

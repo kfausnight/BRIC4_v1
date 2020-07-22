@@ -12,47 +12,17 @@
 * Support and FAQ: visit <a href="http://www.atmel.com/design-support/">Atmel Support</a>
 */
 
-
+#include <asf.h>
 #include <main.h>
+#include "conf_usb.h"
+//
 
 // Debug
-volatile uint8_t debug1, debug2, debug3, debug4;
-bool USART_BLE_enabled;
-bool debug_ota;
+volatile uint32_t debug1, debug2, debug3, debug4;
+#define DEBUG_DISPLAY false
 
-// Physical Pin Defines
-#define button1	IOPORT_CREATE_PIN(IOPORT_PORTB, 9)
-#define button2	IOPORT_CREATE_PIN(IOPORT_PORTA, 4)
-#define button3	IOPORT_CREATE_PIN(IOPORT_PORTA, 6)
-#define button4	IOPORT_CREATE_PIN(IOPORT_PORTA, 7)
-#define buttonE	IOPORT_CREATE_PIN(IOPORT_PORTA, 5)
-#define SDA		IOPORT_CREATE_PIN(IOPORT_PORTA, 12)
-#define SCL		IOPORT_CREATE_PIN(IOPORT_PORTA, 13)
-#define MCU_TX1	IOPORT_CREATE_PIN(IOPORT_PORTA, 8)//bluetooth module TX
-#define MCU_RX1	IOPORT_CREATE_PIN(IOPORT_PORTA, 9)//bluetooth module RX
-#define MCU_RTS1		IOPORT_CREATE_PIN(IOPORT_PORTA, 10)//bluetooth module RTS
-#define MCU_CTS1		IOPORT_CREATE_PIN(IOPORT_PORTA, 11)//bluetooth module CTS
-#define MCU_TX2	IOPORT_CREATE_PIN(IOPORT_PORTA, 16)
-#define MCU_RX2	IOPORT_CREATE_PIN(IOPORT_PORTA, 17)
-#define mosi	IOPORT_CREATE_PIN(IOPORT_PORTB, 10)//SPI MOSI
-#define miso	IOPORT_CREATE_PIN(IOPORT_PORTB, 8)//SPI MISO
-#define sclk	IOPORT_CREATE_PIN(IOPORT_PORTB, 11)//SPI SCLK
-#define lcd_SS	IOPORT_CREATE_PIN(IOPORT_PORTA, 23)//CS6
-#define acc1_SS	IOPORT_CREATE_PIN(IOPORT_PORTA, 18)//CS1
-#define acc2_SS	IOPORT_CREATE_PIN(IOPORT_PORTA, 19)//CS2
-#define mag1_SS IOPORT_CREATE_PIN(IOPORT_PORTA, 21)//CS4
-#define mag2_SS IOPORT_CREATE_PIN(IOPORT_PORTA, 20)//CS3
-#define SD_CS	IOPORT_CREATE_PIN(IOPORT_PORTA, 15)//CS7
-#define BLE_SS		IOPORT_CREATE_PIN(IOPORT_PORTA, 22)//CS5
-#define V2_enable	IOPORT_CREATE_PIN(IOPORT_PORTB, 2)
-#define laser_reset IOPORT_CREATE_PIN(IOPORT_PORTA, 2)
-#define LCD_SPI_SS_PIN   IOPORT_CREATE_PIN(IOPORT_PORTA, 23)//LCD SS
-#define LCD_SPI_DC_PIN   IOPORT_CREATE_PIN(IOPORT_PORTA, 27)//LCD A0
-#define LCD_SPI_RST_PIN  IOPORT_CREATE_PIN(IOPORT_PORTB, 23)//LCD RST
-#define BLE_ota  IOPORT_CREATE_PIN(IOPORT_PORTB, 22)//BL OTA
-#define BLE_autorun	IOPORT_CREATE_PIN(IOPORT_PORTA, 14)//BL Auto Run
-#define BLE_reset	IOPORT_CREATE_PIN(IOPORT_PORTA, 3)
-//#define SD_CS		IOPORT_CREATE_PIN(IOPORT_PORTB, 3)
+
+
 
 
 //Common Constants:
@@ -66,6 +36,11 @@ const float mt2ft	=	3.28084; //  1 meter = 3.28084 feet
 #define maxErrorSensitivity 3
 #define incErrorSensitivity 0.2
 char display_str[254];
+#define DEBOUNCE_MS	300		// ms
+#define QUICK3_MS	1500	// ms
+#define OFF_HOLD_COUNT	96  // 32k, div1024 prescaler;  32 counts/second
+bool USART_BLE_enabled;
+bool debug_ota;
 
 volatile enum INPUT current_input, last_input;
 volatile bool buttonE_triggered=false;
@@ -74,9 +49,10 @@ volatile enum STATE current_state;
 volatile bool state_change = true;
 
 volatile bool laser_triggered;
-volatile uint8_t click_counter;//Used to count external button clicks to wake up 
 struct OPTIONS options;
 
+//  Variable to track when plugged in and charging
+bool isCharging = false;
 
 //  Calibration Data Buffers
 // Azm and Inc Calibration
@@ -115,13 +91,6 @@ void configure_extint_channel(void);
 void configure_extint_callbacks(void);
 void extint_routine(void);
 
-
-//Clock functions
-enum clock_type {clock_ext, clock_int, clock_low, clock_high} ;
-void setup_XOSC32k(void);
-void clock_32k_source(enum clock_type);
-void clock_16M_source(enum clock_type);
-
 //SD card functions
 FATFS FatFS;         /* Work area (file system object) for logical drives */
 FIL file1, file2, file_cal_report, file_cal_raw;      /* file objects */
@@ -129,6 +98,13 @@ FRESULT SD_status;
 char filename[30];
 FRESULT configure_SD(void);
 FRESULT save_measurement(struct MEASUREMENT *meas_inst);
+
+//  USB funcations
+bool my_flag_autorize_msc_transfert = false;
+bool usb_transaction_requested = false;
+//bool my_callback_msc_enable(void);
+//void my_callback_msc_disable(void);
+//void msc_notify_trans(void);
 
 
 // Menu cursors
@@ -168,7 +144,6 @@ STATE_NEXTSTATE state_nextstate[] = {
 	{st_main_display,	input_buttonE,	st_aim},
 	{st_main_display,	input_powerdown,	st_powerdown},
 	
-	
 	{st_aim,			input_button1,	st_aim_abort},
 	{st_aim,			input_button2,	st_aim_abort},
 	{st_aim,			input_button3,	st_aim_abort},
@@ -187,6 +162,8 @@ STATE_NEXTSTATE state_nextstate[] = {
 	{st_powerdown,		input_button3,	st_powerup},
 	{st_powerdown,		input_button4,	st_powerup},
 	{st_powerdown,		input_wakeup,	st_powerup},
+	{st_powerdown,		input_usb_transaction,	st_powerup},
+		
 
 	{st_powerup,		input_state_complete,	st_main_display},
 	
@@ -304,58 +281,64 @@ STATE_FUNCTIONS state_functions[]={
 
 };
 
-
+uint32_t debugRTC;
 
 
 
 int main (void)
 {
 	uint8_t i; // Iteration counter
+	
+	
+	
 	config_pins_powerup();
 	system_init();
 	delay_init();
+	board_init();
 	delay_ms(500);	
-	wdt_enable();//******************debug
-	setup_spi();
-	configure_i2c_master();	
-	glcd_init();
-	configure_extint_channel();
-	configure_extint_callbacks();	
+	setup_rtc();	
+	
+	
+	fn_powerup();
+	
+	
+	
+	
+	//Debug////////////
+	debugRTC = rtc_count_get_count(&rtc1);	
+	////////////////
+	setup_charger();
 	setup_batt();
-	setup_accel(&slave_acc1);
-	setup_accel(&slave_acc2);	
-	setup_mag(&slave_mag1);
-	setup_mag(&slave_mag2);
-	configure_usart();
-	ext_osc_onoff(true);
-	setup_XOSC32k();
-	clock_32k_source(clock_ext);
-	configure_timers(st_powerup);
-	system_interrupt_enable_global();	
 	sleepmgr_init();
 	load_user_settings();
 	load_calibration();
-	setup_charger();
-	backlightOn();
+	//system_interrupt_enable_global();
 	
-	configure_SD();	
-	rangefinder_on_off(false);
-	ioport_reset_pin_mode(BLE_ota);//  Needed to reset pin mode; set in some previous initialization
-	ioport_set_pin_dir(BLE_ota, IOPORT_DIR_OUTPUT);//  Needed to reset pin mode; set in some previous initialization
-	ioport_set_pin_level(BLE_ota, false);//  Needed to reset pin mode; set in some previous initialization
-	
+
 	current_state = st_main_display;
 	current_input = input_1sec;
 	
+	////////////////////////////////debug
+	// Disable watchdog timer
+	//wdt_disable();
+	////////////////////////
+	
+	
 	while(1){
-		if (current_input==input_none){
-			clock_16M_source(clock_low);//  Set clock low to conserve power
-			while(current_input == input_none);//hold here until an input
-			clock_16M_source(clock_high);// Move clock back to high speed
+		while ((current_input==input_none)){
+			if (usb_transaction_requested){
+				while(udi_msc_process_trans());
+				usb_transaction_requested = false;				
+			}
+			sleepmgr_sleep(SLEEPMGR_IDLE);
 		}
+		
+		
 		wdt_reset_count();//******************debug
 		//  Determine if idle powerdown will be performed
-		idle_timeout();//Will produce input=idle_timeout if idle for too long
+		debug2++;
+		idle_timeout();//Will produce input = input_powerdown if idle
+		
 		
 		//  Find state 
 		//  State a function of current input		
@@ -380,14 +363,13 @@ int main (void)
 			}
 		}
 
-		
 	}//End of main program while loop
 }//end of main
 
 void fn_debug_charger(void){
 	uint8_t addressList[] = {
 		0x00, 
-		0x01,
+		0x02,
 		0x06,
 		0x07,
 		0x0B,
@@ -1090,34 +1072,15 @@ FRESULT save_measurement(struct MEASUREMENT *meas_inst){
 	
 	pbw = &bw;
 	
-	// Get current time
-	//get_time(); // Already performed during measurement
-	
-	
-	//  Set up SD card
-	config_spi(SD_card);		
-	spi_select_slave(&spi_main, &slave_SD, true);	
-
-	diskio_status = disk_status(0);
-	
-	if(diskio_status){
-		//Possibly card not initialized
-		configure_SD();
-		diskio_status = disk_status(0);
-		if(diskio_status){
-			fdebug1 = FR_NOT_READY;
-			SD_status = fdebug1;
-			config_spi(LCD);
-			return fdebug1;	
-		}
-		
-	}
-	
-	
 	//  Format data for text data file
 	sprintf(filename, "20%02x%02x%02x_datafile.csv", current_time.year, current_time.month, current_time.date);
 		
 	fdebug1 = f_open(&file1, filename, FA_OPEN_EXISTING | FA_READ | FA_WRITE);
+	
+	if ((fdebug1!=FR_OK) && (fdebug1!=FR_NO_FILE)){
+		//  Something failed, exit function
+		return fdebug1;
+	}
 	
 	if (fdebug1 == FR_NO_FILE){
 		// File does not exist, create new file with header
@@ -1125,7 +1088,6 @@ FRESULT save_measurement(struct MEASUREMENT *meas_inst){
 		
 		if(fdebug2!=FR_OK){
 			SD_status = fdebug2;
-			config_spi(LCD);
 			return fdebug2;
 		}
 
@@ -1140,7 +1102,6 @@ FRESULT save_measurement(struct MEASUREMENT *meas_inst){
 		
 	}else if(fdebug1 != FR_OK){
 		SD_status = fdebug1;
-		config_spi(LCD);
 		return fdebug1;		
 	}
 	
@@ -1169,10 +1130,6 @@ FRESULT save_measurement(struct MEASUREMENT *meas_inst){
 	fdebug2 = f_lseek(&file1, f_size(&file1));
 	fdebug3 = f_write(&file1, write_string_full, strlen(write_string_full), pbw);
 	f_close(&file1);
-	
-	
-	spi_select_slave(&spi_main, &slave_SD, false);
-	config_spi(LCD);
 
 	return fdebug3;
 }
@@ -1180,14 +1137,13 @@ FRESULT save_measurement(struct MEASUREMENT *meas_inst){
 
 FRESULT configure_SD(void){
 	FRESULT fdebug1;
-	config_spi(SD_card);
-	spi_select_slave(&spi_main, &slave_SD, true);
-	spi_clear();
+	//spi_select_slave(&spi_main, &slave_SD, true);
 	sd_mmc_init();
+	
+	disk_status(0);	
 
-	fdebug1 = f_mount(&FatFS, "", 1);
-	spi_select_slave(&spi_main, &slave_SD, false);
-	config_spi(LCD);
+	fdebug1 = f_mount(0, &FatFS);
+	//spi_select_slave(&spi_main, &slave_SD, false);
 	
 	return fdebug1;
 }
@@ -1388,7 +1344,28 @@ void fn_menu1(void){
 	sprintf(display_str, ">");
 	glcd_tiny_draw_string(3, cur_Y,display_str);
 	
+	
+	//debug//////////////
+	#if DEBUG_DISPLAY==true
+	debug1++;
+	sprintf(display_str,"debug1:%d", debug1);
+	glcd_tiny_draw_string(0,3,display_str);
+	sprintf(display_str,"debug2:%d", debug2);
+	glcd_tiny_draw_string(0,4,display_str);
+	sprintf(display_str,"debug3:%d", debug3);
+	glcd_tiny_draw_string(0,5,display_str);
+	sprintf(display_str,"debug4:%d", debug4);
+	glcd_tiny_draw_string(0,6,display_str);
+	#endif
+	////////////////////////
+	
+	
+	
 	glcd_write();
+	
+	
+	
+	
 	
 }
 
@@ -1673,7 +1650,8 @@ void fn_set_options(void){
 				default:
 					break;
 			}
-			
+		default:
+		break;	
 
 	}
 	
@@ -1721,8 +1699,26 @@ void fn_set_options(void){
 	sprintf(display_str, ">");
 	glcd_tiny_draw_string(0, cur_Y,display_str);
 		
+	
+	//debug//////////////
+	#if DEBUG_DISPLAY==true
+	debug1++;
+	sprintf(display_str,"debug1:%d", debug1);
+	glcd_tiny_draw_string(0,3,display_str);
+	sprintf(display_str,"debug2:%d", debug2);
+	glcd_tiny_draw_string(0,4,display_str);
+	sprintf(display_str,"debug3:%d", debug3);
+	glcd_tiny_draw_string(0,5,display_str);
+	sprintf(display_str,"debug4:%d", debug4);
+	glcd_tiny_draw_string(0,6,display_str);
+	#endif
+	////////////////////////	
+		
+		
 	glcd_write();
 
+
+	
 }
 
 
@@ -1826,58 +1822,62 @@ void fn_set_bluetooth(void){
 
 
 void fn_set_clock(void){
-	
+	uint8_t i, unitMax, unitMin, temp;
+	uint8_t *unitPtr;
 	// Used for setting clock
 	typedef struct {
-		uint8_t x_pos; //cursor x position
 		uint8_t y_pos;//cursor y position
 		uint8_t min;  //unit max
 		uint8_t max;  //unit min
-		uint8_t *data; //unit location
+		uint8_t *ptr; //unit location
 	} CLOCK_SETTING;
 	
 	CLOCK_SETTING clock_table[] = {
-		{10,	3,	0,	0x24, &temp_time.hours},
-		{40,	3,	0,	0x59, &temp_time.minutes},
-		{70,	3,	0,	0x59, &temp_time.seconds},
-		{10,	6,	1,	0x31, &temp_time.date},
-		{40,	6,	1,	0x12, &temp_time.month},
-		{76,	6,	0,	0x99, &temp_time.year}
+		{1,	0,	99, &temp_time.year},
+		{2,	1,	12, &temp_time.month},
+		{3,	1,	31, &temp_time.date},
+		{4,	0,	24, &temp_time.hours},
+		{5,	0,	59, &temp_time.minutes},
+		{6,	0,	59, &temp_time.seconds}
 	};
 	
+	
 	if (state_change) {
-		cur_X = 0;
-		cur_X_low = 0;
-		cur_X_high = 5;
+		cur_Y = 1;
+		cur_Y_low = 1;
+		cur_Y_high = 6;
 		get_time();
 		memcpy(&temp_time,&current_time,sizeof(current_time));	
 	}
 	
+	for (i=0;i<6;i++){
+		if (cur_Y==clock_table[i].y_pos){
+			unitMax = clock_table[i].max;
+			unitMin = clock_table[i].min;
+			unitPtr = clock_table[i].ptr;
+			break;
+		}
+	}
 	
 	
 	
 	switch(last_input){
 		case input_button2:
-			if(*clock_table[cur_X].data < clock_table[cur_X].max){
-				++ *clock_table[cur_X].data;
-				bcd_adj(clock_table[cur_X].data);
-				}
+			*unitPtr = incBcdData(*unitPtr, 1, unitMin, unitMax);
 			break;
 		case input_button3:
-			if(*clock_table[cur_X].data > clock_table[cur_X].min){
-				-- *clock_table[cur_X].data;
-				bcd_adj(clock_table[cur_X].data);
-				}
+			*unitPtr = incBcdData(*unitPtr, -1, unitMin, unitMax);
 			break;
 		case input_button1:
-			if(cur_X >= cur_X_high){
+			if(cur_Y >= cur_Y_high){
 				set_time();
 				current_input = input_state_complete;
 				}
-			else{++cur_X;}
+			else{++cur_Y;}
 			break;
 		default:
 			break;
+			//  input_button4 aborts t
 	}
 	
 	glcd_tiny_set_font(Font5x7,5,7,32,127);
@@ -1885,18 +1885,18 @@ void fn_set_clock(void){
 	
 	sprintf(display_str,"Set Clock:");
 	glcd_tiny_draw_string(0,0,display_str);
-	
-	sprintf(display_str,"Hour Min  Sec");
+	sprintf(display_str,"Year:   20%02x", temp_time.year);
 	glcd_tiny_draw_string(10,1,display_str);
-	sprintf(display_str,"%02x   %02x   %02x",
-	temp_time.hours, temp_time.minutes, temp_time.seconds);
+	sprintf(display_str,"Month:  %02x", temp_time.month);
 	glcd_tiny_draw_string(10,2,display_str);
-	
-	sprintf(display_str,"Date Month Year");
+	sprintf(display_str,"Date:   %02x", temp_time.date);
+	glcd_tiny_draw_string(10,3,display_str);
+	sprintf(display_str,"Hour:   %02x", temp_time.hours);
 	glcd_tiny_draw_string(10,4,display_str);
-	sprintf(display_str,"%02x   %02x    20%02x",
-	temp_time.date, temp_time.month, temp_time.year);
+	sprintf(display_str,"Minute: %02x", temp_time.minutes);
 	glcd_tiny_draw_string(10,5,display_str);
+	sprintf(display_str,"Second: %02x", temp_time.seconds);
+	glcd_tiny_draw_string(10,6,display_str);
 	
 	// Display soft keys
 	sprintf(display_str, "+");
@@ -1909,8 +1909,8 @@ void fn_set_clock(void){
 	glcd_tiny_draw_string(92,7,display_str);
 	
 	//Display Pointer
-	sprintf(display_str, "^");
-	glcd_tiny_draw_string(clock_table[cur_X].x_pos,clock_table[cur_X].y_pos,display_str);
+	sprintf(display_str, ">");
+	glcd_tiny_draw_string(1, cur_Y,display_str);
 	
 	glcd_write();
 		
@@ -1926,24 +1926,20 @@ void fn_main_display(void){
 	
 	//Handle Button Inputs
 	if(last_input==input_button2){
-		if(options.backlight_setting.brightness<3){
-			backlightPlus();
-			save_user_settings();
-		}
+		backlightPlus();
+		save_user_settings();
 	}else if(last_input==input_button3){
-		if(options.backlight_setting.brightness>0){
-			backlightMinus();
+		backlightMinus();
 			save_user_settings();
-		}
 	}
 	
 }
 
 void print_data_screen(void){
 	static bool flipper;
-	uint8_t batt_charge_status;
+	
 	get_time();
-	batt_charge_status = getChargerStatus();
+	isCharging = getChargerStatus();
 	
 	glcd_tiny_set_font(Font5x7,5,7,32,127);
 	glcd_clear_buffer();
@@ -1962,7 +1958,7 @@ void print_data_screen(void){
 
 	
 	//  Draw Charge Status	
-	if (batt_charge_status){
+	if (isCharging){
 		if (flipper){
 			flipper = false;
 		}else{
@@ -2058,11 +2054,17 @@ void print_data_screen(void){
 
 	}
 	//debug//////////////
-	//sprintf(display_str,"%d", debug1);
-	//glcd_tiny_draw_string(0,0,display_str);
-	//sprintf(display_str,"%d", debug2);
-	//glcd_tiny_draw_string(0,1,display_str);
-	
+	#if DEBUG_DISPLAY==true
+	debug1++;
+	sprintf(display_str,"debug1:%d", debug1);
+	glcd_tiny_draw_string(0,3,display_str);
+	sprintf(display_str,"debug2:%d", debug2);
+	glcd_tiny_draw_string(0,4,display_str);
+	sprintf(display_str,"debug3:%d", debug3);
+	glcd_tiny_draw_string(0,5,display_str);
+	sprintf(display_str,"debug4:%d", debug4);
+	glcd_tiny_draw_string(0,6,display_str);
+	#endif
 	////////////////////////
 
 	
@@ -2207,7 +2209,7 @@ void configure_extint_channel(void)
 	extint_chan_get_config_defaults(&config_extint_chan);
 	config_extint_chan.gpio_pin_pull      = EXTINT_PULL_UP;
 	config_extint_chan.detection_criteria = EXTINT_DETECT_FALLING;
-	config_extint_chan.filter_input_signal  = true;
+	config_extint_chan.filter_input_signal  = false;
 	config_extint_chan.enable_async_edge_detection = true;
 	// button 4
 	config_extint_chan.gpio_pin           = PIN_PA07A_EIC_EXTINT7;
@@ -2256,48 +2258,91 @@ void configure_extint_callbacks(void)
 
 void extint_routine(void)
 {
+	static uint32_t last_time_ms;
+	uint32_t current_time_ms;
+	enum INPUT tempInput;
+	
+	//cpu_irq_disable();
+	
+	
+	current_time_ms = rtc_count_get_count(&rtc1);
+	
+	
+
 	switch (extint_get_current_channel()){
 		case 5:
-			externalButtonRoutine(!ioport_get_pin_level(buttonE));
+			tempInput = externalButtonRoutine(!ioport_get_pin_level(buttonE));
 			break;
 		case 7:
-			current_input = input_button4;
+			tempInput = input_button4;
 			break;
 		case 6:
-			current_input = input_button3;
+			tempInput = input_button3;
 			break;
 		case 4:
-			current_input = input_button2;
-			break;			
-		case 9:
-			current_input = input_button1;
+			tempInput = input_button2;
 			break;
-		
+		case 9:
+			tempInput = input_button1;
+			break;
+		default:
+			tempInput = input_none;
+			break;
+	}// End switch for each input type
+	
+	
+	
+	//  Debounce Function
+	if(tempInput != input_none){
+		if((current_time_ms-last_time_ms)>DEBOUNCE_MS){
+			last_time_ms = current_time_ms;	
+			current_input = tempInput;
+			// debug
+			//debug4 = debug3;
+			//debug3 = current_time_ms-last_time_ms;
+		}
 	}
-		
+	//cpu_irq_enable();
+	
+	
 }
 
-void externalButtonRoutine(bool buttonOn){
+enum INPUT externalButtonRoutine(bool buttonOn){
 	// Button External
 	// Special Routines for External Button
 	// If held down for less than X seconds, provides normal input upon release
 	// If held down for more than X seconds, a separate interrupt routine provides powerdown input
 	// When in powerdown state, 3 quick clicks through a separate interrupt routine provides powerup input
-	
+	static uint32_t last_time_ms;
+	uint32_t current_time_ms;
+	static uint8_t click_counter=0;
 	
 	if (current_state == st_powerdown){
 		//  wakup on 3 quick clicks
 		if (buttonOn){//if external button is pressed
-			quick3_timer(true);
-			click_counter = click_counter+1;//  click_counter reset by timer interrupt routine if timer expires.
+			current_time_ms = rtc_count_get_count(&rtc1);
+			if(  ((current_time_ms-last_time_ms)<QUICK3_MS)&
+				((current_time_ms-last_time_ms)>(DEBOUNCE_MS/4)) ){
+				click_counter++;
+			}else{
+				click_counter = 1;
+			}
+			last_time_ms = current_time_ms;
 		}
 		if (click_counter>=3){
-			current_input = input_wakeup;
+			click_counter = 0;
+			return input_wakeup;
+			
+		}else{
+			return input_none;	
 		}
-		return;	
+		
 	}
 	
-	
+	if (current_state == st_powerup){
+		//  Ignore external button inputs during powerup
+		return input_none;	
+	}
 	
 	if (buttonOn){
 		//  Trigger on if button is pressed
@@ -2307,14 +2352,13 @@ void externalButtonRoutine(bool buttonOn){
 			tc_set_count_value(&timer1, 0);
 			tc_start_counter(&timer1);
 		}
-		return;
+		return input_none;
 		
 	}else{
 		//  Releaed in a short amount of time, normal input
 		buttonE_triggered=false;
 		tc_stop_counter(&timer1);
-		current_input = input_buttonE;
-		return;	
+		return input_buttonE;	
 		
 	}
 	
@@ -2338,10 +2382,10 @@ void fn_powerdown(void){
 		configure_timers(st_powerdown);//Disable TC	
 		
 	};	
-		
-	sleepmgr_lock_mode(SLEEPMGR_STANDBY);
-	sleep_mode = sleepmgr_get_sleep_mode();
-	sleepmgr_sleep(SLEEPMGR_STANDBY);
+	udc_stop();// disable USB
+	
+	sleepmgr_sleep(SLEEPMGR_IDLE);
+	//sleepmgr_enter_sleep();
 	
 }
 
@@ -2349,12 +2393,17 @@ void fn_powerup(void){
 	config_pins_powerup();
 	delay_ms(100);
 	
+	//Debug////////////
+	debugRTC = rtc_count_get_count(&rtc1);
+	////////////////
 	setup_spi();
 	configure_i2c_master();
 	configure_usart();
-	//configure_usart_callbacks();
-	
-	glcd_init();
+	configure_usart_callbacks();	
+	//Debug////////////
+	debugRTC = rtc_count_get_count(&rtc1);
+	////////////////
+	load_user_settings();//  Needed for backlight setting
 	backlightOn();
 	configure_extint_channel();
 	configure_extint_callbacks();
@@ -2362,21 +2411,19 @@ void fn_powerup(void){
 	setup_accel(&slave_acc2);
 	setup_mag(&slave_mag1);
 	setup_mag(&slave_mag2);
-	
-	
-	
-	system_interrupt_enable_global();
-
-	config_spi(LCD);
-	
-	delay_ms(50);	
+	rangefinder_on_off(false);	
+	//Debug////////////
+	debugRTC = rtc_count_get_count(&rtc1);
+	////////////////
 	ext_osc_onoff(true);
-	delay_ms(50);	
+	delay_ms(10);	
 	setup_XOSC32k();
-	clock_32k_source(clock_ext);
-	
+	clock_32k_source(clock_ext);	
 	configure_timers(st_powerup);
-	
+	delay_ms(10);
+	//Debug////////////
+	debugRTC = rtc_count_get_count(&rtc1);
+	////////////////
 	configure_SD();
 	
 	ioport_reset_pin_mode(BLE_ota);//  Needed to reset pin mode; set in some previous initialization
@@ -2385,66 +2432,25 @@ void fn_powerup(void){
 	
 	wdt_enable();
 	
+	delay_ms(500);
+	//config_spi(LCD);
+	glcd_init();
 	buttonE_triggered=false;
 	current_input = input_state_complete;
+	//Debug////////////
+	debugRTC = rtc_count_get_count(&rtc1);
+	////////////////
+	
+	
+	system_interrupt_enable_global();
+	
+	irq_initialize_vectors();
+	cpu_irq_enable();
+	udc_start();
 	
 }
 
 
-void setup_XOSC32k(void){
-	struct system_clock_source_xosc32k_config xosc32k_conf;
-	system_clock_source_xosc32k_get_config_defaults(&xosc32k_conf);
-
-	xosc32k_conf.frequency           = 32768UL;
-	xosc32k_conf.external_clock      = CONF_CLOCK_XOSC32K_EXTERNAL_CRYSTAL;
-	xosc32k_conf.startup_time        = CONF_CLOCK_XOSC32K_STARTUP_TIME;
-	xosc32k_conf.enable_1khz_output  = CONF_CLOCK_XOSC32K_ENABLE_1KHZ_OUPUT;
-	xosc32k_conf.enable_32khz_output = CONF_CLOCK_XOSC32K_ENABLE_32KHZ_OUTPUT;
-	xosc32k_conf.on_demand           = false;
-	xosc32k_conf.run_in_standby      = CONF_CLOCK_XOSC32K_RUN_IN_STANDBY;
-
-	system_clock_source_xosc32k_set_config(&xosc32k_conf);
-	system_clock_source_enable(SYSTEM_CLOCK_SOURCE_XOSC32K);
-	while(!system_clock_source_is_ready(SYSTEM_CLOCK_SOURCE_XOSC32K));
-	if (CONF_CLOCK_XOSC32K_ON_DEMAND) {
-		OSC32KCTRL->XOSC32K.bit.ONDEMAND = 1;
-	}
-	
-	
-	
-}
-
-
-void clock_32k_source(enum clock_type ext_int){
-	struct system_gclk_gen_config gclock_gen_conf;
-	
-	system_gclk_gen_get_config_defaults(&gclock_gen_conf);
-	gclock_gen_conf.run_in_standby = true;
-	if(ext_int == clock_ext){
-		gclock_gen_conf.source_clock = SYSTEM_CLOCK_SOURCE_XOSC32K;
-	}else{
-		gclock_gen_conf.source_clock = SYSTEM_CLOCK_SOURCE_ULP32K;
-	}	
-	system_gclk_gen_set_config(GCLK_GENERATOR_2, &gclock_gen_conf);
-    system_gclk_gen_enable(GCLK_GENERATOR_2);
-		
-}
-
-
-void clock_16M_source(enum clock_type high_low){
-	struct system_gclk_gen_config gclock_gen_conf;
-	
-	system_gclk_gen_get_config_defaults(&gclock_gen_conf);
-	gclock_gen_conf.run_in_standby = true;
-	if(high_low == clock_high){
-		gclock_gen_conf.source_clock =SYSTEM_CLOCK_SOURCE_OSC16M;
-	}else{
-		gclock_gen_conf.source_clock = SYSTEM_CLOCK_SOURCE_ULP32K;
-	}
-	system_gclk_gen_set_config(GCLK_GENERATOR_0, &gclock_gen_conf);
-    system_gclk_gen_enable(GCLK_GENERATOR_0);
-	
-}
 
 void getDefaultOptions(struct OPTIONS *optionptr){
 	
@@ -2453,9 +2459,6 @@ void getDefaultOptions(struct OPTIONS *optionptr){
 	optionptr->current_unit_dist = meters;
 	optionptr->chargeCurrent = 100;//mA
 	optionptr->errorSensitivity = 1;
-	//optionptr->backlight_setting.blue = 30;
-	//optionptr->backlight_setting.green = 30;
-	//optionptr->backlight_setting.red = 22;
 	optionptr->backlight_setting.colorRef = 1;//white
 	optionptr->backlight_setting.brightness = 3;
 	optionptr->backlight_setting.maxColor = 30;
@@ -2465,4 +2468,25 @@ void getDefaultOptions(struct OPTIONS *optionptr){
 
 	
 }
+
+void msc_notify_trans(void){
+	
+	//current_input=input_usb_transaction;
+	usb_transaction_requested = true;
+}
+
+
+bool my_callback_msc_enable(void)
+{
+	my_flag_autorize_msc_transfert = true;
+	return true;
+}
+void my_callback_msc_disable(void)
+{
+	my_flag_autorize_msc_transfert = false;
+}
+
+
+
+
 

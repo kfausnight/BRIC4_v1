@@ -3,45 +3,35 @@
  *
  * \brief Common SD/MMC stack
  *
- * Copyright (c) 2014-2015 Atmel Corporation. All rights reserved.
+ * Copyright (c) 2014-2018 Microchip Technology Inc. and its subsidiaries.
  *
  * \asf_license_start
  *
  * \page License
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
+ * Subject to your compliance with these terms, you may use Microchip
+ * software and any derivatives exclusively with Microchip products.
+ * It is your responsibility to comply with third party license terms applicable
+ * to your use of third party software (including open source software) that
+ * may accompany Microchip software.
  *
- * 1. Redistributions of source code must retain the above copyright notice,
- *    this list of conditions and the following disclaimer.
- *
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
- *
- * 3. The name of Atmel may not be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * 4. This software may only be redistributed and used in connection with an
- *    Atmel microcontroller product.
- *
- * THIS SOFTWARE IS PROVIDED BY ATMEL "AS IS" AND ANY EXPRESS OR IMPLIED
- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT ARE
- * EXPRESSLY AND SPECIFICALLY DISCLAIMED. IN NO EVENT SHALL ATMEL BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
- * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
- * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * THIS SOFTWARE IS SUPPLIED BY MICROCHIP "AS IS". NO WARRANTIES,
+ * WHETHER EXPRESS, IMPLIED OR STATUTORY, APPLY TO THIS SOFTWARE,
+ * INCLUDING ANY IMPLIED WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY,
+ * AND FITNESS FOR A PARTICULAR PURPOSE. IN NO EVENT WILL MICROCHIP BE
+ * LIABLE FOR ANY INDIRECT, SPECIAL, PUNITIVE, INCIDENTAL OR CONSEQUENTIAL
+ * LOSS, DAMAGE, COST OR EXPENSE OF ANY KIND WHATSOEVER RELATED TO THE
+ * SOFTWARE, HOWEVER CAUSED, EVEN IF MICROCHIP HAS BEEN ADVISED OF THE
+ * POSSIBILITY OR THE DAMAGES ARE FORESEEABLE.  TO THE FULLEST EXTENT
+ * ALLOWED BY LAW, MICROCHIP'S TOTAL LIABILITY ON ALL CLAIMS IN ANY WAY
+ * RELATED TO THIS SOFTWARE WILL NOT EXCEED THE AMOUNT OF FEES, IF ANY,
+ * THAT YOU HAVE PAID DIRECTLY TO MICROCHIP FOR THIS SOFTWARE.
  *
  * \asf_license_stop
  *
  */
 /*
- * Support and FAQ: visit <a href="http://www.atmel.com/design-support/">Atmel Support</a>
+ * Support and FAQ: visit <a href="https://www.microchip.com/support/">Microchip Support</a>
  */
 
 #include <asf.h>
@@ -54,6 +44,9 @@
 #include "delay.h"
 #include <comms/comms.h>
 
+
+//extern struct spi_module spi_main;// kfausnight 4/26/2020
+//extern struct spi_slave_inst	slave_SD;// kfausnight 4/26/2020
 
 /**
  * \ingroup sd_mmc_stack
@@ -156,7 +149,7 @@ enum card_state {
 };
 
 //! SD/MMC card information structure
-struct sd_mmc_card_def {
+struct sd_mmc_card {
 	uint32_t clock;            //!< Card access clock
 	uint32_t capacity;         //!< Card capacity in KBytes
 #if (defined SD_MMC_0_CD_GPIO)
@@ -176,7 +169,7 @@ struct sd_mmc_card_def {
 
 //! SD/MMC card list
 //! Note: Initialize card detect pin fields if present
-static struct sd_mmc_card_def sd_mmc_cards[SD_MMC_MEM_CNT]
+static struct sd_mmc_card sd_mmc_cards[SD_MMC_MEM_CNT]
 #if (defined SD_MMC_0_CD_GPIO) && (defined SD_MMC_0_WP_GPIO)
  = {
 # define SD_MMC_CD_WP(slot, unused) \
@@ -188,9 +181,7 @@ static struct sd_mmc_card_def sd_mmc_cards[SD_MMC_MEM_CNT]
 #elif (defined SD_MMC_0_CD_GPIO)
  = {
 # define SD_MMC_CD(slot, unused) \
-	{.cd_gpio = SD_MMC_##slot##_CD_GPIO, \
-	 .state = SD_MMC_CARD_STATE_DEBOUNCE,  \
-	 .clock = SDMMC_CLOCK_INIT},
+	{.cd_gpio = SD_MMC_##slot##_CD_GPIO},
 	MREPEAT(SD_MMC_MEM_CNT, SD_MMC_CD, ~)
 # undef SD_MMC_CD
 }
@@ -200,7 +191,7 @@ static struct sd_mmc_card_def sd_mmc_cards[SD_MMC_MEM_CNT]
 //! Index of current slot configurated
 static uint8_t sd_mmc_slot_sel;
 //! Pointer on current slot configurated
-static struct sd_mmc_card_def *sd_mmc_card;
+static struct sd_mmc_card *sd_mmc_card;
 //! Number of block to read or write on the current transfer
 static uint16_t sd_mmc_nb_block_to_tranfer = 0;
 //! Number of block remaining to read or write on the current transfer
@@ -1332,7 +1323,6 @@ static sd_mmc_err_t sd_mmc_select_slot(uint8_t slot)
 
 #if (defined SD_MMC_0_CD_GPIO)
 	//! Card Detect pins
-	
 	if (port_pin_get_input_level(sd_mmc_cards[slot].cd_gpio)
 			!= SD_MMC_0_CD_DETECT_VALUE) {
 		if (sd_mmc_cards[slot].state == SD_MMC_CARD_STATE_DEBOUNCE) {
@@ -1430,6 +1420,7 @@ static bool sd_mmc_spi_card_init(void)
 	delay_ms(1);//Added by KFausnight
 	spi_select_slave(&spi_main, &slave_SD, true);	//Added by KFausnight
 	delay_ms(1);//Added by KFausnight
+
 	// CMD0 - Reset all cards to idle state.
 	if (!driver_send_cmd(SDMMC_SPI_CMD0_GO_IDLE_STATE, 0)) {
 		return false;
@@ -1781,7 +1772,7 @@ void sd_mmc_init(void)
 		sd_mmc_cards[slot].state = SD_MMC_CARD_STATE_NO_CARD;
 	}
 	sd_mmc_slot_sel = 0xFF; // No slot configurated
-	driver_init();
+	//driver_init(); //  Kfausnight 20200721.  Not needed; SPI initiated in comm.c code
 }
 
 uint8_t sd_mmc_nb_slot(void)

@@ -22,8 +22,9 @@ src/ASF/common/services/storage/ctrl_access/ctrl_access.d \
  ../src/ASF/sam0/utils/cmsis/saml21/include_b/saml21.h \
  ../src/ASF/sam0/utils/cmsis/saml21/include_b/saml21g18b.h \
  ../src/ASF/thirdparty/CMSIS/Include/core_cm0plus.h \
- ../src/ASF/thirdparty/CMSIS/Include/core_cmInstr.h \
- ../src/ASF/thirdparty/CMSIS/Include/core_cmFunc.h \
+ ../src/ASF/thirdparty/CMSIS/Include/cmsis_version.h \
+ ../src/ASF/thirdparty/CMSIS/Include/cmsis_compiler.h \
+ ../src/ASF/thirdparty/CMSIS/Include/cmsis_gcc.h \
  ../src/ASF/sam0/utils/cmsis/saml21/source/system_saml21.h \
  ../src/ASF/sam0/utils/cmsis/saml21/include_b/component/ac.h \
  ../src/ASF/sam0/utils/cmsis/saml21/include_b/component/adc.h \
@@ -124,7 +125,8 @@ src/ASF/common/services/storage/ctrl_access/ctrl_access.d \
  ../src/ASF/common/services/storage/ctrl_access/ctrl_access.h \
  ../src/config/conf_access.h ../src/ASF/common/boards/board.h \
  ../src/ASF/common2/boards/user_board/user_board.h \
- ../src/config/conf_board.h
+ ../src/config/conf_board.h ../src/comms\sd_mmc_mem.h \
+ ../src/ASF/common/services/storage/ctrl_access/ctrl_access.h
 
 ../src/ASF/sam0/utils/compiler.h:
 
@@ -170,9 +172,11 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\lib\gc
 
 ../src/ASF/thirdparty/CMSIS/Include/core_cm0plus.h:
 
-../src/ASF/thirdparty/CMSIS/Include/core_cmInstr.h:
+../src/ASF/thirdparty/CMSIS/Include/cmsis_version.h:
 
-../src/ASF/thirdparty/CMSIS/Include/core_cmFunc.h:
+../src/ASF/thirdparty/CMSIS/Include/cmsis_compiler.h:
+
+../src/ASF/thirdparty/CMSIS/Include/cmsis_gcc.h:
 
 ../src/ASF/sam0/utils/cmsis/saml21/source/system_saml21.h:
 
@@ -377,3 +381,7 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-no
 ../src/ASF/common2/boards/user_board/user_board.h:
 
 ../src/config/conf_board.h:
+
+../src/comms\sd_mmc_mem.h:
+
+../src/ASF/common/services/storage/ctrl_access/ctrl_access.h:
