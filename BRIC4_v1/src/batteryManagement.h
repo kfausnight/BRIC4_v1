@@ -9,9 +9,8 @@
 #ifndef BATTERYMANAGEMENT_H_
 #define BATTERYMANAGEMENT_H_
 
-#include <main.h>
+
 #include <asf.h>
-#include <comms/comms.h>
 
 
 //Battery Fuel Gauge
@@ -21,7 +20,7 @@ uint16_t getBatteryLevel(void);
 
 
 //Battery Charger
-void setup_charger(void);
+void setChargeCurrent(uint32_t);
 uint8_t getChargerStatus(void);
 uint8_t getChargerRegister(uint8_t);
 
@@ -29,7 +28,7 @@ uint8_t getChargerRegister(uint8_t);
 void bin2str(uint8_t, char *);
 
 
-
+//#include <main.h>
 
 
 

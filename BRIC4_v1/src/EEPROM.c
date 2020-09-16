@@ -2,37 +2,73 @@
  * EEPROM.c
  *
  * Created: 2/2/2019 1:53:07 PM
+ *  For MICROCHIP EEPROM 24LC32A
  *  Author: Kris Fausnight
  */ 
 
-#include <stdint.h>
-#include <EEPROM.h>
-#include <comms/comms.h>
 
-#include <calibration.h>
-#include <sensors.h>
-#include <main.h>
+#include <EEPROM.h>
+
 
 //  EEPROM I2C address
 #define EEPROM_add		0x57  //0b1010111RW
+#define PAGE_SIZE 128 // per datasheet for 24LC512
 
 
-//  EEPROM Memory Map and Key
+//  EEPROM Memory Map 
+#define add_options		0x0100
 #define add_a1_calst	0x0300
 #define add_a2_calst	0x0400
-#define add_c1_calst	0x0500
-#define add_c2_calst	0x0600
+#define add_m1_calst	0x0500
+#define add_m2_calst	0x0600
 #define add_dist_calst	0x0700
-#define add_cal_report_azm_inc	0x0800
-#define add_cal_report_dist		0x0900
-#define add_options				0x0102
-
-extern struct INST_CAL a1_calst, a2_calst, c1_calst, c2_calst, dist_calst;
-extern struct CAL_REPORT cal_report_azm_inc, cal_report_dist;
-extern struct OPTIONS options;
-extern struct BACKLIGHT_SETTING backlight_setting;
+#define add_cal_report	0x0800
+#define add_calRawData_full	0x1000
+#define add_calRawData_qazm	0x2500
+#define add_test		0xC000
 
 
+uint16_t EEPROM_get_address(enum CALTYPE caltype){
+	uint16_t tempAddr;
+	switch (caltype){
+		case inc_azm_full:
+			tempAddr = add_calRawData_full;
+			break;
+		case azm_quick:
+			tempAddr = add_calRawData_qazm;
+			break;
+		default:
+			tempAddr = 0;
+	}
+	return tempAddr;
+}
+
+
+void EEPROM_saveCalRawData(enum CALTYPE caltype){
+	uint32_t addOff;
+	uint16_t tempAddr = EEPROM_get_address(caltype);
+		
+	EEPROM_write(tempAddr ,a1Raw, sizeof(a1Raw));
+	addOff = sizeof(a1Raw);
+	EEPROM_write(tempAddr + addOff ,a2Raw, sizeof(a2Raw));
+	addOff = addOff+sizeof(a2Raw);
+	EEPROM_write(tempAddr + addOff,m1Raw, sizeof(m1Raw));
+	addOff = addOff+sizeof(m1Raw);
+	EEPROM_write(tempAddr+addOff ,m2Raw, sizeof(m2Raw));
+}
+
+void EEPROM_loadCalRawData(enum CALTYPE caltype){
+	uint32_t addOff;
+	uint16_t tempAddr = EEPROM_get_address(caltype);
+		
+	EEPROM_read(tempAddr ,a1Raw, sizeof(a1Raw));
+	addOff = sizeof(a1Raw);
+	EEPROM_read(tempAddr + addOff ,a2Raw, sizeof(a2Raw));
+	addOff = addOff+sizeof(a2Raw);
+	EEPROM_read(tempAddr + addOff,m1Raw, sizeof(m1Raw));
+	addOff = addOff+sizeof(m1Raw);
+	EEPROM_read(tempAddr+addOff ,m2Raw, sizeof(m2Raw));
+}
 
 
 void load_user_settings(void){
@@ -71,19 +107,18 @@ void load_calibration(void){
 	//  Read All  calibration structure back	
 	EEPROM_read(add_a1_calst, &a1_calst, sizeof(a1_calst)); 
 	EEPROM_read(add_a2_calst, &a2_calst, sizeof(a1_calst));
-	EEPROM_read(add_c1_calst, &c1_calst, sizeof(a1_calst));
-	EEPROM_read(add_c2_calst, &c2_calst, sizeof(a1_calst));
+	EEPROM_read(add_m1_calst, &m1_calst, sizeof(a1_calst));
+	EEPROM_read(add_m2_calst, &m2_calst, sizeof(a1_calst));
 	EEPROM_read(add_dist_calst, &dist_calst, sizeof(a1_calst));
-	EEPROM_read(add_cal_report_azm_inc, &cal_report_azm_inc, sizeof(cal_report_azm_inc));
-	EEPROM_read(add_cal_report_dist, &cal_report_dist, sizeof(cal_report_azm_inc));
+	EEPROM_read(add_cal_report, &cal_report, sizeof(cal_report));
 	
 	// assume first struct is representative of remainder
 	if(tempCal.Cal_Initialized_Key != a1_calst.Cal_Initialized_Key){
 		//  EEPROM data has not been initialized or is out of date
 		cal_init_struct(&a1_calst);
 		cal_init_struct(&a2_calst);
-		cal_init_struct(&c1_calst);
-		cal_init_struct(&c2_calst);
+		cal_init_struct(&m1_calst);
+		cal_init_struct(&m2_calst);
 		cal_init_struct(&dist_calst);
 		save_calibration();		
 	}
@@ -96,29 +131,32 @@ void save_calibration(void){
 
 	uint8_t bytes_calst, bytes_report;
 	
-	bytes_report = sizeof(cal_report_azm_inc);
+	bytes_report = sizeof(cal_report);
 	bytes_calst = sizeof(a1_calst);
 	
 	// Save calibration structures
 	EEPROM_write(add_a1_calst, &a1_calst, bytes_calst);
 	EEPROM_write(add_a2_calst, &a2_calst, bytes_calst);
-	EEPROM_write(add_c1_calst, &c1_calst, bytes_calst);
-	EEPROM_write(add_c2_calst, &c2_calst, bytes_calst);
+	EEPROM_write(add_m1_calst, &m1_calst, bytes_calst);
+	EEPROM_write(add_m2_calst, &m2_calst, bytes_calst);
 	EEPROM_write(add_dist_calst, &dist_calst, bytes_calst);
 		
 	// Save Calibration Report
-	EEPROM_write(add_cal_report_azm_inc, &cal_report_azm_inc, bytes_report);
-	EEPROM_write(add_cal_report_dist, &cal_report_dist, bytes_report);
+	EEPROM_write(add_cal_report, &cal_report, bytes_report);
 	
 	
+}
+void save_cal_report(void){
+	EEPROM_write(add_cal_report, &cal_report, sizeof(cal_report));
+}
+void load_cal_report(void){
+	EEPROM_read(add_cal_report, &cal_report, sizeof(cal_report));
 }
 
 
 
 
-
-void EEPROM_read(uint16_t data_address, uint8_t data_buf[], uint8_t bytes_to_read){
-	uint16_t limit=20;
+void EEPROM_read(uint16_t data_address, uint8_t data_buf[], uint32_t bytes_to_read){
 	uint16_t timeout;
 	struct i2c_master_packet packet = {
 		.address     = EEPROM_add,
@@ -138,14 +176,13 @@ void EEPROM_read(uint16_t data_address, uint8_t data_buf[], uint8_t bytes_to_rea
 	packet.data_length=2;
 	timeout=0;
 	while (i2c_master_write_packet_wait(&i2c_master_instance, &packet) !=STATUS_OK) {
-		if (timeout++ == limit) {   break;   }
 	}
 	//  Send read request to eeprom chip
 	packet.data = data_buf;
 	packet.data_length=bytes_to_read;
 	timeout=0;
 	while (i2c_master_read_packet_wait(&i2c_master_instance, &packet) !=STATUS_OK) {
-		if (timeout++ == limit) {   break;   }
+		//if (timeout++ == limit) {   break;   }
 	}
 	
 	
@@ -153,50 +190,81 @@ void EEPROM_read(uint16_t data_address, uint8_t data_buf[], uint8_t bytes_to_rea
 	
 }
 
-void EEPROM_write(uint16_t address_init, uint8_t data_buf[], uint8_t bytes_to_write){
-	#define page_size 32 // per datasheet for 24LC32A
-	uint8_t packets;
-	uint8_t k,p;
-	uint8_t send_buf[page_size+2];
-	uint8_t bytes_packet;
+void EEPROM_write(uint16_t address_init, uint8_t data_buf[], uint32_t bytes_to_write){
+	enum status_code i2c_code;
+	uint32_t bytes_written;
+	uint16_t bytes_possible;
+	uint16_t bytes_packet;
 	uint16_t address_packet;
-	struct i2c_master_packet packet;
-	
-	uint16_t limit=200;
+	uint32_t bytes_remainder;
+	uint16_t  i;
+
+	uint8_t send_buf[PAGE_SIZE+2];
 	uint16_t timeout;
+	
 	//  Packet template
+	struct i2c_master_packet packet;
 	packet.data = send_buf;
 	packet.ten_bit_address = false;
 	packet.high_speed = false;
 	packet.hs_master_code = 0x0;
 	packet.address = EEPROM_add;
-	//  Determine number of packets
-	packets = floor(bytes_to_write/page_size)+1;
 
-	//  Iterate through packets
-	for (p=0;p<packets;p++){
-		//  Determine bytes to write in packet
-		if (bytes_to_write>page_size){
-			bytes_packet = page_size;
-			bytes_to_write = bytes_to_write-page_size;
-			}else{
-			bytes_packet = bytes_to_write;
+
+	//  Initialize variables
+	bytes_written = 0;
+	address_packet = address_init;
+	bytes_remainder = bytes_to_write;
+	
+	//  Send packets until everything is written
+	while(bytes_written<bytes_to_write){
+		//  Can only send in 32-byte page increments 
+		//  Cannot pass page boundaries
+		bytes_possible = PAGE_SIZE-(address_packet & 0x7F);
+		//  Determine number of bytes to send in packet
+		if (bytes_possible<bytes_remainder){
+			bytes_packet = bytes_possible;
+		}else{
+			bytes_packet = bytes_remainder;
 		}
-		packet.data_length = bytes_packet + 2;// Include 16-bit address
-		//  Set address
-		address_packet = address_init + p*page_size;
-		send_buf[0] = address_packet>>8;//high byte
-		send_buf[1] = address_packet & 0x00FF;// low byte
-		//  Copy data to buffer
-		for (k=0;k<bytes_packet;k++){
-			send_buf[k+2] = data_buf[p*page_size+k];
+		//  Set up Packet
+		send_buf[0] = address_packet>>8;
+		send_buf[1] = address_packet & 0x00FF;
+		packet.data_length = bytes_packet+2; //2 for data address
+		for (i=0;i<bytes_packet;i++){
+			send_buf[i+2] = data_buf[bytes_written+i];
 		}
+		
 		// Send Packet
 		timeout=0;
 		while (i2c_master_write_packet_wait(&i2c_master_instance, &packet) !=STATUS_OK) {
-			if (timeout++ == limit) {   break;   }
+			//if (timeout++ == 0xFFFF) {   break;   }
 		}
+		//  Increment Variables
+		bytes_written = bytes_written+bytes_packet;
+		bytes_remainder = bytes_to_write-bytes_written;
+		address_packet = address_packet+bytes_packet;
 		
 	}
 	
 }
+
+
+void EEPROM_test(void){
+	#define debugMax 1000
+	uint8_t debugArrIn[debugMax];
+	uint8_t debugArrOut[debugMax];
+	uint32_t di;
+	
+	for (di=0;di<debugMax;di++){
+		debugArrIn[di] = di;
+		debugArrOut[di] = 0;
+	}
+	EEPROM_write(add_test, debugArrIn, debugMax);
+	EEPROM_read(add_test, debugArrOut, debugMax);
+	
+	
+}
+
+
+

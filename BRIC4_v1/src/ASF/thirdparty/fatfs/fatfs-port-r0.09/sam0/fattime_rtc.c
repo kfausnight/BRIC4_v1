@@ -31,11 +31,13 @@
  *
  */
 #include "compiler.h"
+#include <main.h>
+
 //#include "rtc_calendar.h" // KFausnight 20200713
 
 //extern struct rtc_module rtc_instance;// KFausnight 20200713
-#include <clockSetup.h>// KFausnight 20200713
-extern struct current_time;// KFausnight 20200713
+//#include <clockSetup.h>// KFausnight 20200713
+//extern struct current_time;// KFausnight 20200713
 
 
 //uint32_t get_fattime(void);
@@ -84,11 +86,6 @@ uint32_t get_fattime(void)
 {
 	uint32_t ul_time;
 
-	//struct rtc_calendar_time current_time;
-
-	//  Get current time from external RTC
-	//get_time(); //commented out; always performed to get posix time stamp and should match
-	
 	// Format into FAT time stamp format
 	ul_time = ((bcd2int(current_time.year) +20 ) << 25)
 	| (bcd2int(current_time.month) << 21)

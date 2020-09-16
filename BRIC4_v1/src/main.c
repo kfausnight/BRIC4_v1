@@ -14,75 +14,64 @@
 
 #include <asf.h>
 #include <main.h>
-#include "conf_usb.h"
+//#include "conf_usb.h"
 //
 
 // Debug
 volatile uint32_t debug1, debug2, debug3, debug4;
+uint32_t debug_ct1, debug_ct2;
 #define DEBUG_DISPLAY false
 
-
-
-
-
-//Common Constants:
-const float software_version = 4.0;
-const float rad2deg = 57.2957795; // (180/pi) radians to degrees
-const float deg2rad  =   0.0174532925; // (pi/180) degrees to radians
-const float mt2ft	=	3.28084; //  1 meter = 3.28084 feet
-// Global variables
-#define shot_delay_max 5 //seconds, max setting
-#define minErrorSensitivity 0.2
-#define maxErrorSensitivity 3
-#define incErrorSensitivity 0.2
-char display_str[254];
-#define DEBOUNCE_MS	300		// ms
-#define QUICK3_MS	1500	// ms
-#define OFF_HOLD_COUNT	96  // 32k, div1024 prescaler;  32 counts/second
-bool USART_BLE_enabled;
-bool debug_ota;
-
-volatile enum INPUT current_input, last_input;
-volatile bool buttonE_triggered=false;
-
-volatile enum STATE current_state;
+//  State Machine Info
+volatile enum INPUT current_input, last_input; // Current and Last Inputs
+volatile enum STATE current_state; //  Current State
 volatile bool state_change = true;
+//  Status Variables
 
-volatile bool laser_triggered;
+volatile bool isCharging = false;//  Variable to track when plugged in and charging
+volatile bool buttonE_triggered = false; // Variable to track when external button is triggered
+//  Options structure
 struct OPTIONS options;
+//  Time structures
+struct TIME current_time, temp_time;
+//SD card functions
+FATFS FatFS;         /* Work area (file system object) for logical drives */
+//FIL file1, file2, file_cal_report, file_cal_raw;      /* file objects */
+FRESULT SD_status;
+char filename[100];
+char write_str1[400];
+char write_str2[400];
+// Buffer to hold characters for display
+char display_str[200];
 
-//  Variable to track when plugged in and charging
-bool isCharging = false;
+//  UART Buffers
+volatile uint8_t rxBufferLaser[UART_BUFFER_LENGTH];
+volatile uint8_t rxBufferLaserIndex;
+volatile char rxBufferBle[UART_BUFFER_LENGTH];
+volatile uint8_t rxBufferBleIndex;
+volatile char debugBuff[DEBUG_BUFFER_LENGTH];
+volatile uint32_t debugBuffIndex = 0;
+char *debugBuffPtr;
 
 //  Calibration Data Buffers
 // Azm and Inc Calibration
-#define nbuf		80//  Size of data buffers
-#define group_size	4// For Azm/Inc calibration
-uint32_t n_groups;//Counter for current added groups
-uint32_t n_points;// Counter for current # of points
-float a1raw[nbuf][3], a2raw[nbuf][3], c1raw[nbuf][3], c2raw[nbuf][3];
-float a1cal[nbuf][3], a2cal[nbuf][3], c1cal[nbuf][3], c2cal[nbuf][3];
-float azimuth[nbuf], inclination[nbuf], roll[nbuf];
-const uint8_t min_groups = 9;// Minimum groups to complete a calibration
-uint8_t ind_buf, ind_stack, buf_points;
+uint32_t nGroups;//Counter for current completed groups
+uint32_t nPoints;// Counter for completed # of points
+float a1Raw[NBUFF][3], a2Raw[NBUFF][3], m1Raw[NBUFF][3], m2Raw[NBUFF][3];
+float a1Cal[NBUFF][3], a2Cal[NBUFF][3], m1Cal[NBUFF][3], m2Cal[NBUFF][3];
+float azimuth[NBUFF], inclination[NBUFF], roll[NBUFF];
 // Distance Calibration
-#define shot_size   4// For Distance calibration
-const float dist_cal_setpoint_ft = 3;//  Distance to set marker during distance calibration, feet
-const float dist_cal_setpoint_mt = 1;//  Distance to set marker during distance calibration, meters
-float dist_raw_buf[shot_size];
-float dist_disp_buf[shot_size];
+float dist_raw_buf[SHOT_SIZE];
+float dist_disp_buf[SHOT_SIZE];
 float temp_dist_offset;
-// All Azm/Inc/Dist Calibration
-
 // Loop Test
 float loop_distance, loop_horizontal, loop_vertical, loop_azimuth, loop_error;
 //   Calibration data structures
-struct INST_CAL a1_calst, a2_calst, c1_calst, c2_calst, dist_calst;
-struct CAL_REPORT cal_report_azm_inc, cal_report_dist;
+struct INST_CAL a1_calst, a2_calst, m1_calst, m2_calst, dist_calst;
+struct CAL_REPORT cal_report;
 
 // Measurement Data Buffers
-#define buf_length	10
-struct MEASUREMENT data_buf[buf_length];
+struct MEASUREMENT data_buf[NBUFF_MEAS];
 uint8_t data_buf_ind = 0;
 uint32_t data_ref = 0;
 
@@ -91,13 +80,7 @@ void configure_extint_channel(void);
 void configure_extint_callbacks(void);
 void extint_routine(void);
 
-//SD card functions
-FATFS FatFS;         /* Work area (file system object) for logical drives */
-FIL file1, file2, file_cal_report, file_cal_raw;      /* file objects */
-FRESULT SD_status;
-char filename[30];
-FRESULT configure_SD(void);
-FRESULT save_measurement(struct MEASUREMENT *meas_inst);
+
 
 //  USB funcations
 bool my_flag_autorize_msc_transfert = false;
@@ -192,10 +175,11 @@ STATE_NEXTSTATE state_nextstate[] = {
 	{st_set_options,		input_state_complete,	st_main_display},
 	{st_set_options,		input_powerdown,		st_powerdown},
 		
-	{st_menu_cal,		input_button4,				st_main_display},
+	{st_menu_cal,		input_button4,				st_menu1},
 	{st_menu_cal,		input_buttonE,				st_main_display},
 	{st_menu_cal,		input_dist_calibration,		st_dist_calibration},
-	{st_menu_cal,		input_acc_comp_calibration,	st_acc_comp_calibration},
+	{st_menu_cal,		input_inc_azm_full_calibration,	st_inc_azm_full_calibration},
+	{st_menu_cal,		input_azm_quick_calibration,	st_azm_quick_calibration},
 	{st_menu_cal,		input_state_complete,		st_main_display},
 	{st_menu_cal,		input_disp_cal_report,		st_disp_cal_report},	
 	{st_menu_cal,		input_loop_test,			st_loop_test},
@@ -207,9 +191,14 @@ STATE_NEXTSTATE state_nextstate[] = {
 	{st_menu_debug,		input_debug_backlight,		st_debug_backlight},	
 	{st_menu_debug,		input_debug_charger,		st_debug_charger},	
 	{st_menu_debug,		input_powerdown,			st_powerdown},
+	{st_menu_debug,		input_reprocess_inc_azm_cal,			st_process_inc_azm_full_cal},
+	{st_menu_debug,		input_reprocess_azm_quick_cal,			st_process_azm_quick_cal},
+	
+	{st_azm_quick_calibration,		input_button4,				st_aim_abort},
+	{st_azm_quick_calibration,		input_state_complete,		st_process_azm_quick_cal},
 		
-	{st_acc_comp_calibration,		input_button4,				st_aim_abort},
-	{st_acc_comp_calibration,		input_state_complete,		st_process_calibration},	
+	{st_inc_azm_full_calibration,		input_button4,				st_aim_abort},
+	{st_inc_azm_full_calibration,		input_state_complete,		st_process_inc_azm_full_cal},	
 		
 	{st_dist_calibration,		input_button4,				st_aim_abort},
 	{st_dist_calibration,		input_state_complete,		st_disp_cal_report},
@@ -228,7 +217,8 @@ STATE_NEXTSTATE state_nextstate[] = {
 	{st_disp_loop_report,		input_buttonE,			st_main_display},
 	{st_disp_loop_report,		input_powerdown,		st_powerdown},
 		
-	{st_process_calibration,		input_state_complete,	st_disp_cal_report},
+	{st_process_inc_azm_full_cal,	input_state_complete,	st_disp_cal_report},
+	{st_process_azm_quick_cal,		input_state_complete,	st_disp_cal_report},
 		
 	{st_error_info,		input_button4,				st_main_display},
 	{st_error_info,		input_buttonE,				st_main_display},	
@@ -268,9 +258,11 @@ STATE_FUNCTIONS state_functions[]={
 	{st_menu1,			fn_menu1	},
 	{st_menu_cal,		fn_menu_cal},
 	{st_menu_debug,		fn_menu_debug},
-	{st_acc_comp_calibration,		fn_acc_comp_calibration},
+	{st_inc_azm_full_calibration,		fn_inc_azm_full_calibration},
 	{st_dist_calibration,			fn_dist_calibration},
-	{st_process_calibration,		fn_process_calibration},
+	{st_azm_quick_calibration,		fn_azm_quick_calibration},
+	{st_process_inc_azm_full_cal,		fn_process_inc_azm_full_cal},
+	{st_process_azm_quick_cal,		fn_process_azm_quick_cal},
 	{st_disp_cal_report,			fn_disp_cal_report},	
 	{st_loop_test,					fn_loop_test},
 	{st_disp_loop_report,			fn_disp_loop_report},	
@@ -281,40 +273,39 @@ STATE_FUNCTIONS state_functions[]={
 
 };
 
-uint32_t debugRTC;
 
 
 
 int main (void)
 {
-	uint8_t i; // Iteration counter
+	uint8_t iter; // Iteration counter
 	
+	uint32_t sizeDebug1, sizeDebug2; 
 	
-	
-	config_pins_powerup();
+
 	system_init();
-	delay_init();
-	board_init();
+	delay_init();	
 	delay_ms(500);	
-	setup_rtc();	
 	
 	
 	fn_powerup();
 	
+	configure_timer_counter();
 	
+	//EEPROM_test();
 	
-	
-	//Debug////////////
-	debugRTC = rtc_count_get_count(&rtc1);	
-	////////////////
-	setup_charger();
+
+	setChargeCurrent(options.chargeCurrent);
 	setup_batt();
 	sleepmgr_init();
 	load_user_settings();
 	load_calibration();
-	//system_interrupt_enable_global();
 	
-
+	options.SerialNumber = getSN();
+	
+	//BLE Setup
+	BLE_init();
+	
 	current_state = st_main_display;
 	current_input = input_1sec;
 	
@@ -325,28 +316,45 @@ int main (void)
 	
 	
 	while(1){
+
 		while ((current_input==input_none)){
+			//  Handle any USB transactions
 			if (usb_transaction_requested){
+				spi_setBaud(baudRateMax);
 				while(udi_msc_process_trans());
-				usb_transaction_requested = false;				
+				
+				usb_transaction_requested = false;		
+				spi_setBaud(baudRateMin);		
 			}
-			sleepmgr_sleep(SLEEPMGR_IDLE);
+			//  Handle any BLE messages that have arrived
+			BLE_handleMessage();
+			//  Return to Sleep State
+			if (current_state==st_powerdown){
+				sleepmgr_sleep(SLEEPMGR_STANDBY);
+			}else{
+				sleepmgr_sleep(SLEEPMGR_IDLE);
+			}
+			
 		}
 		
-		
-		wdt_reset_count();//******************debug
-		//  Determine if idle powerdown will be performed
 		debug2++;
+		wdt_reset_count();
+		
+		//  Determine if idle powerdown will be performed		
 		idle_timeout();//Will produce input = input_powerdown if idle
+		
+		//  Laser Timeout
+		laser_timeout();
+		
 		
 		
 		//  Find state 
 		//  State a function of current input		
 		state_change = false;
-		for (i=0; i<(sizeof(state_nextstate)/sizeof(STATE_NEXTSTATE));i++){
-			if((current_state==state_nextstate[i].current) && (current_input==state_nextstate[i].input)){
-				if(current_state!=state_nextstate[i].next){
-					current_state = state_nextstate[i].next;
+		for (iter=0; iter<(sizeof(state_nextstate)/sizeof(STATE_NEXTSTATE));iter++){
+			if((current_state==state_nextstate[iter].current) && (current_input==state_nextstate[iter].input)){
+				if(current_state!=state_nextstate[iter].next){
+					current_state = state_nextstate[iter].next;
 					state_change = true;
 				}
 				break;
@@ -356,9 +364,9 @@ int main (void)
 		current_input = input_none;
 		
 		//  Find and run function for current state
-		for(i=0;i<(sizeof(state_functions)/sizeof(STATE_FUNCTIONS));i++){
-			if(current_state==state_functions[i].current){
-				state_functions[i].Function();				
+		for(iter=0;iter<(sizeof(state_functions)/sizeof(STATE_FUNCTIONS));iter++){
+			if(current_state==state_functions[iter].current){
+				state_functions[iter].Function();				
 				break;
 			}
 		}
@@ -422,163 +430,439 @@ void fn_debug_rawData(void){
 	sprintf(display_str, "Acc 1     Acc 2  Done");
 	glcd_tiny_draw_string(0,0,display_str);
 	
-	sprintf(display_str, "X: %+0.3f %+0.3f", meas_debug.a1xyz[0], meas_debug.a2xyz[0]);
+	sprintf(display_str, "X: %+0.3f %+0.3f", meas_debug.a1Raw[0], meas_debug.a2Raw[0]);
 	glcd_tiny_draw_string(0,1,display_str);
-	sprintf(display_str, "Y: %+0.3f %+0.3f", meas_debug.a1xyz[1], meas_debug.a2xyz[1]);
+	sprintf(display_str, "Y: %+0.3f %+0.3f", meas_debug.a1Raw[1], meas_debug.a2Raw[1]);
 	glcd_tiny_draw_string(0,2,display_str);
-	sprintf(display_str, "Z: %+0.3f %+0.3f", meas_debug.a1xyz[2], meas_debug.a2xyz[2]);
+	sprintf(display_str, "Z: %+0.3f %+0.3f", meas_debug.a1Raw[2], meas_debug.a2Raw[2]);
 	glcd_tiny_draw_string(0,3,display_str);
 	
 	sprintf(display_str, "Comp 1    Comp 2  ");
 	glcd_tiny_draw_string(0,4,display_str);
 	
-	sprintf(display_str, "X: %+0.3f %+0.3f", meas_debug.c1xyz[0], meas_debug.c2xyz[0]);
+	sprintf(display_str, "X: %+0.3f %+0.3f", meas_debug.m1Raw[0], meas_debug.m2Raw[0]);
 	glcd_tiny_draw_string(0,5,display_str);
-	sprintf(display_str, "Y: %+0.3f %+0.3f", meas_debug.c1xyz[1], meas_debug.c2xyz[1]);
+	sprintf(display_str, "Y: %+0.3f %+0.3f", meas_debug.m1Raw[1], meas_debug.m2Raw[1]);
 	glcd_tiny_draw_string(0,6,display_str);
-	sprintf(display_str, "Z: %+0.3f %+0.3f Exit", meas_debug.c1xyz[2], meas_debug.c2xyz[2]);
+	sprintf(display_str, "Z: %+0.3f %+0.3f Exit", meas_debug.m1Raw[2], meas_debug.m2Raw[2]);
 	glcd_tiny_draw_string(0,7,display_str);
 	glcd_write();	
 }
 
-void fn_process_calibration(void){
-	uint8_t i, j;
+
+
+void fn_azm_quick_calibration(void){
+	#define xMin	5
+	#define yMin	5
+	#define nBands	9
+	#define numPoints	96
+	uint8_t segBand[] = {3, 9, 9, 18, 18, 18, 9, 9, 3};// 96 total units
+	#define bandWidth	6
+	#define yHeight	54
+	
+	
+	float m1Buf[NBUFFQAZM][3];
+	float m2Buf[NBUFFQAZM][3];
+	bool isStable1, isStable2;
+	
+	struct MEASUREMENT tempM;
+	float xPos, yPos;
+	bool tracker[NBUFF];
+	float debug;
+
+	static uint32_t measCounterCurrent = 0;
+	static uint32_t measCounterLast = 0;
+	float angX, temp;
+	
+	
+	uint8_t k, band, seg, nSeg, trackerInd, segHeight;
+	uint8_t xSeg1, xSeg2, ySeg1, ySeg2;
+	
+	if (state_change){
+		cal_disp_message();
+		//  Set up initial settings
+		for (k=0;k<NBUFF;k++){
+			tracker[k] = false;
+		}
+		//  Set up initial settings
+		cal_init();
+		last_input = input_none;
+	}
+	
+	
+	measCounterCurrent = 0;
+	while(current_input==input_none){
+		
+		
+		//  Take measurement for plotting purposes	
+		quick_measurement(&tempM);	
+		measCounterCurrent++;//  Debug; checking measurement rate
+		
+		//  Normalize Roll Angle based on accelerometer
+		//  Offset roll angle 180 to center with display up
+		tempM.roll = tempM.roll+180;
+		if (tempM.roll>360){tempM.roll = tempM.roll-360;}
+		yPos = yMin+((tempM.roll)/360)*(yHeight); 
+		//  XPos is based on magnetometer angle from X axis
+		calc_theta_XY( tempM.m1Raw , &temp, &angX);
+		xPos = xMin+((angX+90)/180)*(nBands*bandWidth);
+		
+		glcd_clear_buffer();
+		trackerInd = 0;
+		nPoints = 0;
+		for (band=0;band<nBands;band++){
+			nSeg = segBand[band];
+			segHeight = yHeight/nSeg;
+			xSeg1 = xMin+bandWidth*band;
+			xSeg2 = xSeg1+bandWidth;
+			for (seg=0;seg<nSeg;seg++){
+				ySeg1 = yMin+segHeight*seg;
+				ySeg2 = ySeg1+segHeight;
+				
+				if(tracker[trackerInd]){
+					//  Draw Segment
+					nPoints++;
+					glcd_fill_rect(xSeg1, ySeg1, bandWidth, segHeight,BLACK);
+				}else{
+					//  Possibly Add Point
+					if((xPos>=xSeg1)&(xPos<xSeg2)&(yPos>=ySeg1) &(yPos<ySeg2)){
+						//  Missing point for this location
+						//  Add a point if stable
+						backlightOff();
+						for(k=0;k<NBUFFQAZM;k++){
+							//  Take a series of measurements
+							read_mag_double(m1Buf[k], m2Buf[k]);
+						}
+						backlightOn(&options.backlight_setting);
+						if (cal_azm_quick_add_point(m1Buf, m2Buf, trackerInd)){
+							//  Point was stable; add to buffer
+							tracker[trackerInd] = true;
+						}
+					}//End:    Check to see if point slot is empty
+					
+				}
+				trackerInd++;
+			}//  Loop for each row
+			
+		}//  Loop for each column
+		
+		//  Draw Roll / Y Indicator
+ 		glcd_draw_line(0, yPos,64, yPos, BLACK);
+		//  Draw Attitude / X Indicator
+		glcd_draw_line(xPos, 0,xPos, 64, BLACK);
+
+		//  Draw box around area
+		glcd_draw_rect(xMin-1, yMin-1, nBands*bandWidth+1, yHeight+1,BLACK);
+		
+		// Display Header
+		sprintf(display_str, "AZM Cal:");
+		glcd_tiny_draw_string(65,0,display_str);	
+		sprintf(display_str, "Abort");
+		glcd_tiny_draw_string(97,7,display_str);
+		sprintf(display_str, "Rate: %d", measCounterLast);
+		glcd_tiny_draw_string(70,1,display_str);
+		sprintf(display_str, "Status:");
+		glcd_tiny_draw_string(70,2,display_str);
+		sprintf(display_str, "%d / %d", nPoints, trackerInd);
+		glcd_tiny_draw_string(70,3,display_str);
+		
+		glcd_write();
+		
+		
+		if (nPoints>=trackerInd){
+			//  Save all Calibration Raw Data
+			cal_done(azm_quick);
+			// Signal completion
+			current_input = input_state_complete;
+		}
+	}
+	measCounterLast = measCounterCurrent;
+	
+
+}
+
+void fn_process_azm_quick_cal(void){
+
+	EEPROM_loadCalRawData(azm_quick);
+	load_cal_report();
+	nGroups = cal_report.groups;
+	nPoints = cal_report.points;
+	
+	//  Display Message
+	glcd_clear_buffer();
+	sprintf(display_str, "Processing Data...");
+	glcd_tiny_draw_string(0,1,display_str);
+	glcd_write();
+	cal_azm_quick_process();
+	wdt_reset_count();
+	sprintf(display_str, "Calibration Complete!");
+	glcd_tiny_draw_string(0,3,display_str);
+	glcd_write();
+	delay_s(3);
+	// Signal completion
+	current_input = input_state_complete;
+	
+}
+
+
+void fn_inc_azm_full_calibration(void){
+	struct MEASUREMENT temp_meas;
+	uint32_t i, k;
+	
+	if (state_change){
+		cal_disp_message();
+		//  Set up initial settings
+		cal_init();
+		last_input = input_none;
+		
+	}
+	
+	// Button Handler
+	switch(last_input){
+		case input_button1:
+			//  Calibration Done button
+			if (nGroups>=MIN_GROUPS){//  Requires min_groups to complete
+				//  Turn off Rangefinder
+				rangefinder_on_off(false);
+				//  Save all Calibration Raw Data
+				
+				cal_done(inc_azm_full);
+				
+				// Signal completion
+				current_input = input_state_complete;
+			}
+			break;
+		case input_button3:
+			cal_resetGroup();
+			break;
+		case input_buttonE:
+			//  Set laser and then take measurement
+			if (!isLaserOn()){
+				// Turn on rangefinder module and laser
+				rangefinder_on_off(true);
+				laser_on_off(true);
+			}else{
+				//  Take measurement and process data
+				full_measurement(&temp_meas, options.shot_delay);
+				//  Turn laser module off
+				rangefinder_on_off(false);
+				cal_add_datapoint(&temp_meas);
+			}
+			break;
+		case input_button4:
+			// Handled by state machine
+			//  Exit from routine
+			break;
+		default:
+			break;
+	}
+	last_input = input_none;	
+	
+	
+	
+	#define boxMinX	2
+	#define boxAminY	16
+	#define boxMminY	40
+	#define boxWidth	79
+	#define boxHeight	8
+
+	glcd_clear_buffer();
+	// Display Header
+	sprintf(display_str, "Calibration Mode");
+	glcd_tiny_draw_string(0,0,display_str);
+
+
+	
+	//  Draw boxes
+	//  Titles
+	sprintf(display_str, "Accelerometer");
+	glcd_tiny_draw_string(0,1,display_str);
+	sprintf(display_str, "Magnetometer");
+	glcd_tiny_draw_string(0,4,display_str);
+	//  Accelerometer
+	//  Add 1 pixel margin so points at edge are visible
+	glcd_draw_rect(boxMinX-1, boxAminY, boxWidth+2, boxHeight, BLACK);
+	//  Magnetometer
+	glcd_draw_rect(boxMinX-1, boxMminY, boxWidth+2, boxHeight, BLACK);
+	
+	//  Draw Points
+	uint8_t ind;
+	float posX_A, posY_A, posX_M, posY_M;	
+	for (i=0;i<nGroups;i++){
+		//  One mark for each group
+		ind = i*GROUP_SIZE;
+		//  Accemerometer Point
+		posX_A = getDispX(a1Raw[ind],boxMinX, boxWidth, false);
+		glcd_draw_line(posX_A ,boxAminY, posX_A, boxAminY+boxHeight-1, BLACK);
+		//  Magnetometer Point
+		posX_M = getDispX(m1Raw[ind],boxMinX, boxWidth, true);
+		glcd_draw_line(posX_M ,boxMminY, posX_M, boxMminY+boxHeight-1, BLACK);
+	}
+	
+	//  Display Current Group Information
+	#define statBarMinY	15
+	#define statBarMinX	88
+	#define statBarSpace	10
+	#define circleRadius	5
+	uint8_t xCir, yCir;
+	for (i=0;i<GROUP_SIZE;i++){
+		yCir = statBarMinY + i*statBarSpace;
+		if (i<cal_getGroupPoints()){
+			glcd_fill_circle(statBarMinX, yCir, circleRadius, BLACK);
+		}else{
+			glcd_draw_circle(statBarMinX, yCir, circleRadius, BLACK);
+		}
+
+	}
+	sprintf(display_str, "G%d", cal_getCurrentGroup());
+	glcd_draw_string_xy(statBarMinX-9,statBarMinY+10*GROUP_SIZE-3,display_str);
+	
+	// Display Current Data
+	sprintf(display_str,"%d of min %d", nGroups, MIN_GROUPS);
+	glcd_tiny_draw_string(0,7,display_str);
+	
+	// Display Soft Keys
+	if (nGroups >= MIN_GROUPS){
+		drawSoftKeys("Done",""," ","Abort");
+	}else{
+		drawSoftKeys(" "," ","","Abort");
+	}
+	sprintf(display_str," G%d", cal_getCurrentGroup());
+	draw2LineSoftKey("Reset",display_str,3);
+	glcd_write();
+	
+	
+	static uint8_t lastPosA =0;
+	static uint8_t lastPosM = 0;
+
+	while(current_input==input_none){	
+		quick_measurement(&temp_meas);
+		posX_A = getDispX(temp_meas.a1Raw,boxMinX, boxWidth, false);
+		posX_M = getDispX(temp_meas.m1Raw,boxMinX, boxWidth, true);
+		posX_A = posX_A-2; // To account for width of character
+		posX_M = posX_M-2; // To account for width of character
+		//  Erase last indicator
+		glcd_tiny_draw_char(lastPosA, 3, ' ');
+		glcd_tiny_draw_char(lastPosM, 6, ' ');
+		//  Draw new indicator
+		glcd_tiny_draw_char(posX_A, 3, '^');
+		glcd_tiny_draw_char(posX_M, 6, '^');
+		//  Write to LCD			
+		glcd_write();
+		//  Save position to overwrite next cycle
+		lastPosA = posX_A;
+		lastPosM = posX_M;
+	}
+
+	
+	
+}
+
+
+void fn_process_inc_azm_full_cal(void){
+	
+	int32_t i, j, k, g, iter;
+	bool tempGroupRemove[NGROUP];
+	bool permGroupRemove[NGROUP];
+	float incErrArray[NGROUP];
+	float azmErrArray[NGROUP];
 	
 	// Disable Watchdog Timer
 	wdt_disable();
 	
-	// Start with empty cal structures
-	cal_init_struct(&a1_calst);
-	cal_init_struct(&a2_calst);
-	cal_init_struct(&c1_calst);
-	cal_init_struct(&c2_calst);	
-	//  Gain and Offset Calibration
-	glcd_clear_buffer();
-	sprintf(display_str, "Processing Data...");
-	glcd_tiny_draw_string(0,0,display_str);
-	sprintf(display_str, "Calibration:");
-	glcd_tiny_draw_string(0,2,display_str);
-	sprintf(display_str, "Gain and Offset Cal");
-	glcd_tiny_draw_string(0,3,display_str);
-	glcd_write();	
+	//wdt_reset_count();
 	
-	//  Perform gain and offset calibration per ellipsoid fit
-	sprintf(display_str, "Accelerometer 1      ");
-	glcd_tiny_draw_string(0,4,display_str);
-	glcd_write();	
-	cal_gain_off(a1raw, &a1_calst);// Gain and Offset Calibration, Accelerometer 1
-	sprintf(display_str, "Accelerometer 2      ");
-	glcd_tiny_draw_string(0,4,display_str);
-	glcd_write();
-	cal_gain_off(a2raw, &a2_calst);// Gain and Offset Calibration, Accelerometer 2
-	sprintf(display_str, "Compass 1            ");
-	glcd_tiny_draw_string(0,4,display_str);
-	glcd_write();
-	cal_gain_off(c1raw, &c1_calst);// Gain and Offset Calibration, Compass 1
-	sprintf(display_str, "Compass 2            ");
-	glcd_tiny_draw_string(0,4,display_str);
-	glcd_write();
-	cal_gain_off(c2raw, &c2_calst);	// Gain and Offset Calibration, Compass 2
-	//  Apply gain and offset calibration
-	for (i=0;i<n_points;i++){
-		cal_apply_cal(a1raw[i], a1cal[i], &a1_calst);
-		cal_apply_cal(a2raw[i], a2cal[i], &a2_calst);
-		cal_apply_cal(c1raw[i], c1cal[i], &c1_calst);
-		cal_apply_cal(c2raw[i], c2cal[i], &c2_calst);
-	}	
+	//  Load cal report to get groups
+	//  Note cal_report.groupsAll is never overwritten after data creation
+	load_cal_report();
 	
-	//  Perform Axis Misalignment Calibration
-	glcd_clear_buffer();
-	sprintf(display_str, "Processing Data...");
-	glcd_tiny_draw_string(0,0,display_str);
-	sprintf(display_str, "Calibration:");
-	glcd_tiny_draw_string(0,2,display_str);
-	sprintf(display_str, "Axis Misalignments:");
-	sprintf(display_str, "Accelerometer 1      ");
-	glcd_tiny_draw_string(0,4,display_str);	glcd_write();
-	cal_axis_misalignments(a1cal, &a1_calst); // Sensor axis misalignments, Accelerometer 1
-	sprintf(display_str, "Accelerometer 2      ");
-	glcd_tiny_draw_string(0,4,display_str);	glcd_write();
-	cal_axis_misalignments(a2cal, &a2_calst);// Sensor axis misalignments, Accelerometer 2
-	sprintf(display_str, "Compass 1            ");
-	glcd_tiny_draw_string(0,4,display_str);	glcd_write();
-	cal_axis_misalignments(c1cal, &c1_calst);// Sensor axis misalignments, Compass 1
-	sprintf(display_str, "Compass 2            ");
-	glcd_tiny_draw_string(0,4,display_str);	glcd_write();
-	cal_axis_misalignments(c2cal, &c2_calst);// Sensor axis misalignments, Compass 2
-	//  Apply gain and offset calibration
-	for (i=0;i<n_points;i++){
-		cal_apply_cal(a1raw[i], a1cal[i], &a1_calst);
-		cal_apply_cal(a2raw[i], a2cal[i], &a2_calst);
-		cal_apply_cal(c1raw[i], c1cal[i], &c1_calst);
-		cal_apply_cal(c2raw[i], c2cal[i], &c2_calst);
+	//  Clear out arrays
+	for (k=0;k<NGROUP;k++){
+		permGroupRemove[k] = false;// Track permanently eliminated group
+		tempGroupRemove[k] = false;// track temporarily eliminated loop group
+		incErrArray[k] = 0;
+		azmErrArray[k] = 0;
 	}
 	
-
-	//  Sensor package to laser axis alignment about Y&Z axis
 	glcd_clear_buffer();
-	sprintf(display_str, "Processing Data...");
-	glcd_tiny_draw_string(0,0,display_str);
-	sprintf(display_str, "Calibration:");
-	glcd_tiny_draw_string(0,2,display_str);
-	sprintf(display_str, "Misalignment Cal, YZ");
-	glcd_tiny_draw_string(0,3,display_str);
-	glcd_write();		
-	for (j=0;j<3;j++){
-		sprintf(display_str, "Iteration: %d of 3    ", j+1);
-		glcd_tiny_draw_string(0,4,display_str);
-		glcd_write();
-		cal_angleYZ(a1cal, &a1_calst);//  Sensor Package to laser Y&Z axis alignment, Accelerometer 1
-		cal_angleYZ(a2cal, &a2_calst);//  Sensor Package to laser Y&Z axis alignment, Accelerometer 2
-		cal_angleYZ(c1cal, &c1_calst);//  Sensor Package to laser Y&Z axis alignment, Compass 1
-		cal_angleYZ(c2cal, &c2_calst);//  Sensor Package to laser Y&Z axis alignment, Compass 2
-	}	
-	//  Apply gain, offset, and angle calibration
-	for (i=0;i<n_points;i++){
-		cal_apply_cal(a1raw[i], a1cal[i], &a1_calst);
-		cal_apply_cal(a2raw[i], a2cal[i], &a2_calst);
-		cal_apply_cal(c1raw[i], c1cal[i], &c1_calst);
-		cal_apply_cal(c2raw[i], c2cal[i], &c2_calst);
-	}	
+	for (iter=0;iter<MAX_BAD_GROUPS;iter++){
+		
+		for (g=cal_report.groupsAll;g>=0;g--){	
+			//  Start at last group and end at 0
+			//  Group 0 removed no groups
+			//  End at Group 0 so that if no bad groups are detected
+			//    this will be the last set of data in memory
+			sprintf(display_str, "Processing Cal Data:");
+			glcd_tiny_draw_string(0,0,display_str);
+			sprintf(display_str, "Iteration %d of %d     ", g, cal_report.groupsAll);
+			glcd_tiny_draw_string(0,2,display_str);
+			glcd_write();
+		
+			EEPROM_loadCalRawData(inc_azm_full);
+		
+			for (k=1;k<=cal_report.groupsAll;k++){
+				if (permGroupRemove[k]||(k==g)){
+					//Remove group of current loop
+					//Also remove group if already in permanent removal list
+					//Group 0 removes no groups
+					tempGroupRemove[k] = true;
+				}else{
+					tempGroupRemove[k] = false;
+				}
+			}
+			nGroups = cal_removeGroup(tempGroupRemove, cal_report.groupsAll);
+			nPoints = nGroups*GROUP_SIZE;
+			
+			//  Process Calibration
+			uint8_t iterations;
+			if (g==0){
+				iterations = 3;
+			}else{
+				iterations = 1;
+			}
+			cal_full_inc_azm_process(iterations);
+			
+			//  Add Cal results to array
+			incErrArray[g] = cal_report.inc_angle_err;
+			azmErrArray[g] = cal_report.azm_angle_err;
+								
+		}//  End Loop:  Cycle through all groups
+		
+		uint32_t badGroup = 0;
+		float badGroupDelta = 0;
+		cal_findBadGroup(incErrArray, azmErrArray, &badGroup, &badGroupDelta);
+		
+		
+		if (badGroupDelta>BAD_GROUP_THRESHOLD){
+			permGroupRemove[badGroup] = true;
+			sprintf(display_str, "Detected Bad Group");
+			glcd_tiny_draw_string(0,4,display_str);
+			sprintf(display_str, "                     ");// Clear line
+			glcd_tiny_draw_string(0,5,display_str);
+			sprintf(display_str, "GRP %d Error %0.3fdeg", badGroup, badGroupDelta);
+			glcd_tiny_draw_string(0,5,display_str);
+			sprintf(display_str, "Group Removed, ");
+			glcd_tiny_draw_string(0,6,display_str);
+			sprintf(display_str, "Restarting Analysis");
+			glcd_tiny_draw_string(0,7,display_str);
+			glcd_write();
+		}else{
+			break;
+		}
+		
+		
+	}//  End Loop Error Optimization loop
 	
-	
-	//  Perform X angle sensor-package to laser misalignment calibration
-	//  Only calibrate the 2nd sensor
-	glcd_clear_buffer();
-	sprintf(display_str, "Processing Data...");
-	glcd_tiny_draw_string(0,0,display_str);
-	sprintf(display_str, "Calibration:");
-	glcd_tiny_draw_string(0,2,display_str);
-	sprintf(display_str, "Misalignment Cal, X");
-	glcd_tiny_draw_string(0,3,display_str);
-	glcd_write();
-	cal_angleX(a1cal, a2cal, &a2_calst);//  Sensor package to laser X-axis alignment, Accelerometer 2
-	cal_angleX(c1cal, c2cal, &c2_calst);//  Sensor package to laser X-axis alignment, Compass 2
-		//  Apply gain, offset, and angle calibration
-	for (i=0;i<n_points;i++){
-		cal_apply_cal(a1raw[i], a1cal[i], &a1_calst);
-		cal_apply_cal(a2raw[i], a2cal[i], &a2_calst);
-		cal_apply_cal(c1raw[i], c1cal[i], &c1_calst);
-		cal_apply_cal(c2raw[i], c2cal[i], &c2_calst);
-	}
-	
-	
-	//  Evaluate performance of calibration
-	glcd_clear_buffer();
-	sprintf(display_str, "Processing Data...");
-	glcd_tiny_draw_string(0,0,display_str);
-	sprintf(display_str, "Evaluating Results   ");
-	glcd_tiny_draw_string(0,2,display_str);
-	glcd_write();
-	cal_evaluate();	
 	//  Write report
-	sprintf(display_str, "Writing Report       ");
-	glcd_tiny_draw_string(0,2,display_str);
-	glcd_write();	
-	cal_write_report();
+	SD_save_raw_data(inc_azm_full);
+	SD_write_report();
+	SD_add_cal_history(inc_azm_full);
 	//  Save data to EEPROM
 	save_calibration();
+	
 	// Calibration Complete
+	//wdt_reset_count();
+	glcd_clear_buffer();
 	sprintf(display_str, "Calibration Complete!");
 	glcd_tiny_draw_string(0,2,display_str);
 	glcd_write();
@@ -591,96 +875,6 @@ void fn_process_calibration(void){
 }
 
 
-void fn_acc_comp_calibration(void){
-	struct MEASUREMENT temp_meas;
-	
-	//uint32_t timer_count;
-	uint8_t disp_groups;
-	// disp_groups is actual number of groups complete including last one not processed
-	if (buf_points>= group_size){disp_groups = n_groups+1;}
-	else{disp_groups = n_groups;}
-	
-	
-	if (state_change){
-		cal_disp_message();
-		//  Set up initial settings
-		n_groups = 0;
-		n_points = 0;
-		ind_stack = 0;
-		ind_buf = 0;
-		buf_points = 0;
-		laser_triggered =  false;
-		last_input = input_none;
-		
-	}
-	
-	// Button Handler
-	switch(last_input){
-		case input_button1:
-			//  Calibration Done button
-			if (disp_groups>=min_groups){//  Requires min_groups to complete
-				//  Turn off Rangefinder
-				rangefinder_on_off(false);
-				//  Add latest datapoint
-				cal_add_datapoint(&temp_meas, true);
-				current_input = input_state_complete;
-			}
-			break;
-		case input_buttonE:
-			//  Set laser and then take measurement
-			if (!laser_triggered){
-				// Turn on rangefinder module and laser
-				rangefinder_on_off(true);
-				laser_on_off(true);
-			}else{
-				//  Take measurement and process data
-				full_measurement(&temp_meas, false);
-				//  Turn laser module off
-				rangefinder_on_off(false);
-				cal_add_datapoint(&temp_meas, false);
-			}
-			break;
-		case input_button4:
-			// Handled by state machine
-			//  Exit from routine
-			break;
-		default:
-			break;
-	}
-	last_input = input_none;	
-	
-	glcd_tiny_set_font(Font5x7,5,7,32,127);
-	glcd_clear_buffer();
-	
-	// Display Header
-	sprintf(display_str, "Calibration Mode");
-	glcd_tiny_draw_string(0,0,display_str);
-	
-	// Display Current Data
-	sprintf(display_str, "Current Group: %d", (n_groups+1));
-	glcd_tiny_draw_string(0,2,display_str);
-	sprintf(display_str, "Status: %d of 4", buf_points );
-	glcd_tiny_draw_string(0,3,display_str);
-	sprintf(display_str, "Complete Groups: %d", disp_groups );
-	glcd_tiny_draw_string(0,5,display_str);
-	
-	
-	// Display Soft Keys
-	//if (n_groups >= 2){
-	if (disp_groups >= min_groups){
-		sprintf(display_str, "Done");
-		glcd_tiny_draw_string(100,0,display_str);
-	}
-	sprintf(display_str, "Abort");
-	glcd_tiny_draw_string(97,7,display_str);
-	
-
-	
-	glcd_write();
-	
-	
-}
-
 void fn_loop_test(void){
 	struct MEASUREMENT temp_meas;
 	//uint32_t timer_count;
@@ -689,17 +883,7 @@ void fn_loop_test(void){
 	if (state_change){
 		cal_disp_message();
 		//  Set up initial settings
-		n_points = 0;
-		loop_distance = 0;
-		loop_horizontal = 0;
-		loop_vertical = 0;
-		loop_azimuth = 0;
-		for (i=0;i<nbuf;i++){
-			azimuth[i]=0;
-			inclination[i]=0;
-			roll[i] = 0;
-		}
-		laser_triggered =  false;
+		cal_init();
 		last_input = input_none;
 	}
 	
@@ -709,17 +893,16 @@ void fn_loop_test(void){
 			//  Calibration Done button
 			ioport_set_pin_level(laser_reset, false);
 			current_input = input_state_complete;
-			
 			break;
 		case input_buttonE:
 			//  Set laser and then take measurement
-			if (!laser_triggered){
+			if (!isLaserOn()){
 				// Turn on rangefinder module and laser
 				rangefinder_on_off(true);
 				laser_on_off(true);
 			}else{
 				//  Take measurement and process data
-				full_measurement(&temp_meas, true);
+				full_measurement(&temp_meas, options.shot_delay);
 				//  Turn laser module off
 				rangefinder_on_off(false);
 				//  Process datapoint
@@ -735,14 +918,14 @@ void fn_loop_test(void){
 	}
 	last_input = input_none;
 	
-	glcd_tiny_set_font(Font5x7,5,7,32,127);
+
 	glcd_clear_buffer();
 	
 	// Display Header
 	sprintf(display_str, "Loop Test:");
 	glcd_tiny_draw_string(0,0,display_str);
 	
-	sprintf(display_str, "Segments: %d", n_points);
+	sprintf(display_str, "Segments: %d", nPoints);
 	glcd_tiny_draw_string(0,2,display_str);
 	sprintf(display_str, "Loop length: %.1f", loop_distance);
 	if (options.current_unit_dist == feet){
@@ -781,44 +964,7 @@ void fn_loop_test(void){
 	glcd_write();
 }
 
-void fn_disp_loop_report(void){
-		char unit_str[4];
-		//float total_error;
-		
-		if (options.current_unit_dist == feet){
-			strcpy(unit_str,"ft");
-		}else{
-			strcpy(unit_str,"m");
-		}
-		
-		
-		glcd_clear_buffer();
-		sprintf(display_str, "Loop Test Report:");
-		glcd_tiny_draw_string(0,0,display_str);
-		
-		sprintf(display_str,"Segments: %d",n_points);
-		glcd_tiny_draw_string(0,1,display_str);
-		
-		sprintf(display_str,"Total Length: %.1f %s", loop_distance, unit_str);
-		glcd_tiny_draw_string(0,2,display_str);
-		
-		sprintf(display_str,"Horz Err: %.3f %s", loop_horizontal, unit_str);
-		glcd_tiny_draw_string(0,3,display_str);
-		
-		sprintf(display_str,"Vert Err: %.3f %s", loop_vertical, unit_str);
-		glcd_tiny_draw_string(0,4,display_str);
-		
-		sprintf(display_str,"  Azim Err: %.1f deg", loop_azimuth);
-		glcd_tiny_draw_string(0,5,display_str);
-		
-		sprintf(display_str,"Loop Err: %.3f%% ", loop_error);
-		glcd_tiny_draw_string(0,5,display_str);
-		
-		
-		
-		glcd_write();
-	
-}
+
 
 
 void fn_dist_calibration(void){
@@ -830,12 +976,7 @@ void fn_dist_calibration(void){
 	if (state_change){
 		cal_disp_message();
 		//  Set up initial settings
-		buf_points = 0;
-		ind_buf = 0;// Circular buffer
-		for (k=0;k<shot_size;k++){
-			dist_raw_buf[k] = 0;
-		}
-		laser_triggered =  false;
+		cal_init();
 		last_input = input_none;
 	}
 	
@@ -843,25 +984,21 @@ void fn_dist_calibration(void){
 	switch(last_input){
 		case input_button1:
 			//  Calibration Done button
-			if (buf_points >= shot_size){
+			if (cal_getGroupPoints() >= SHOT_SIZE){
 				//  Turn off rangefinder
 				rangefinder_on_off(false);
-				// Process Calibration data
-				cal_dist_process();
-				//  Save data to EEPROM
-				save_calibration();
 				current_input = input_state_complete;
 			}
 			break;
 		case input_buttonE:
 			//  Set laser and then take measurement
-			if (!laser_triggered){
+			if (!isLaserOn()){
 				// Turn on rangefinder module and laser
 				rangefinder_on_off(true);
 				laser_on_off(true);
 			}else{
 				//  Take measurement and process data
-				full_measurement(&temp_meas, false);
+				full_measurement(&temp_meas, options.shot_delay);
 				//  Turn laser module off
 				rangefinder_on_off(true);
 			}
@@ -875,16 +1012,16 @@ void fn_dist_calibration(void){
 	}
 	last_input = input_none;
 	
-	glcd_tiny_set_font(Font5x7,5,7,32,127);
+
 	glcd_clear_buffer();
 	
 	// Display Header
 	sprintf(display_str, "Calibration Mode");
 	glcd_tiny_draw_string(0,0,display_str);
 	if (options.current_unit_dist == feet){
-		sprintf(display_str, " Target %.1f feet",dist_cal_setpoint_ft);
+		sprintf(display_str, " Target %.1f feet",DIST_CAL_SETPOINT_FT);
 	}else{
-		sprintf(display_str, " Target %.1f meters.",dist_cal_setpoint_mt);
+		sprintf(display_str, " Target %.1f meters.",DIST_CAL_SETPOINT_MT);
 	}
 	glcd_tiny_draw_string(0,1,display_str);
 	
@@ -902,8 +1039,7 @@ void fn_dist_calibration(void){
 	glcd_tiny_draw_string(0,6,display_str);
 
 	// Display Soft Keys
-	//if (n_groups >= 2){
-	if (buf_points >= shot_size){
+	if (cal_getGroupPoints() >= SHOT_SIZE){
 		sprintf(display_str, "Calibration      Done");
 		glcd_tiny_draw_string(0,0,display_str);
 	}
@@ -916,52 +1052,66 @@ void fn_dist_calibration(void){
 
 void cal_disp_message(void){
 	wdt_disable();
-	if (current_state==st_acc_comp_calibration){
-		glcd_tiny_set_font(Font5x7,5,7,32,127);
-		glcd_clear_buffer();
 	
-		sprintf(display_str, "Azm/Inc Calibration:");
-		glcd_tiny_draw_string(0,0,display_str);
-		sprintf(display_str, "Take Uni-Directional Groups of 4 Shots    while rotating       instrument. Only last4 shots of each groupwill be saved");
-		glcd_tiny_draw_string(0,1,display_str);		
-	}else if(current_state == st_dist_calibration){
-		glcd_tiny_set_font(Font5x7,5,7,32,127);
-		glcd_clear_buffer();
-		sprintf(display_str, "Distance Calibration:");
-		glcd_tiny_draw_string(0,0,display_str);
-		sprintf(display_str, "Place a target at");
-		glcd_tiny_draw_string(0,1,display_str);
-		if (options.current_unit_dist == feet){
-			sprintf(display_str, "  %.1f feet.",dist_cal_setpoint_ft);
-		}else{
-			sprintf(display_str, "  %.1f meters.",dist_cal_setpoint_mt);
-		}
-		glcd_tiny_draw_string(0,2,display_str);
-		sprintf(display_str, "Take min. 4 shots in");
-		glcd_tiny_draw_string(0,3,display_str);
-		sprintf(display_str, "Multiple Orientations");
-		glcd_tiny_draw_string(0,4,display_str);
-		sprintf(display_str, "Only last 4 used.");
-		glcd_tiny_draw_string(0,5,display_str);
-		
-		
-		
-	}else if(current_state == st_loop_test){
-		glcd_tiny_set_font(Font5x7,5,7,32,127);
-		glcd_clear_buffer();
-		sprintf(display_str, "Loop Test:");
-		glcd_tiny_draw_string(0,0,display_str);
-		sprintf(display_str, "Take a series of");
-		glcd_tiny_draw_string(0,1,display_str);
-		sprintf(display_str, "measurements ending");
-		glcd_tiny_draw_string(0,2,display_str);
-		sprintf(display_str, "back at the first");
-		glcd_tiny_draw_string(0,3,display_str);
-		sprintf(display_str, "point.  Press 'Done'");
-		glcd_tiny_draw_string(0,4,display_str);
-		sprintf(display_str, "when complete.");
-		glcd_tiny_draw_string(0,5,display_str);
+	glcd_clear_buffer();
+	
+	switch(current_state){
+		case st_inc_azm_full_calibration:
+			sprintf(display_str, "Azm/Inc Calibration:");
+			glcd_tiny_draw_string(0,0,display_str);
+			sprintf(display_str, "Take Uni-Directional Groups of 4 Shots    while rotating       instrument. Only last4 shots of each groupwill be saved");
+			glcd_tiny_draw_string(0,1,display_str);
+			break;
+		case st_dist_calibration:
+			sprintf(display_str, "Distance Calibration:");
+			glcd_tiny_draw_string(0,0,display_str);
+			sprintf(display_str, "Place a target at");
+			glcd_tiny_draw_string(0,1,display_str);
+			if (options.current_unit_dist == feet){
+				sprintf(display_str, "  %.1f feet.", DIST_CAL_SETPOINT_FT);
+			}else{
+				sprintf(display_str, "  %.1f meters.", DIST_CAL_SETPOINT_MT);
+			}
+			glcd_tiny_draw_string(0,2,display_str);
+			sprintf(display_str, "Take min. 4 shots in");
+			glcd_tiny_draw_string(0,3,display_str);
+			sprintf(display_str, "Multiple Orientations");
+			glcd_tiny_draw_string(0,4,display_str);
+			sprintf(display_str, "Only last 4 used.");
+			glcd_tiny_draw_string(0,5,display_str);
+			break;
+		case st_loop_test:
+			sprintf(display_str, "Loop Test:");
+			glcd_tiny_draw_string(0,0,display_str);
+			sprintf(display_str, "Take a series of");
+			glcd_tiny_draw_string(0,1,display_str);
+			sprintf(display_str, "measurements ending");
+			glcd_tiny_draw_string(0,2,display_str);
+			sprintf(display_str, "back at the first");
+			glcd_tiny_draw_string(0,3,display_str);
+			sprintf(display_str, "point.  Press 'Done'");
+			glcd_tiny_draw_string(0,4,display_str);
+			sprintf(display_str, "when complete.");
+			glcd_tiny_draw_string(0,5,display_str);
+			break;
+		case st_azm_quick_calibration:
+			sprintf(display_str, "Azm Quick Calibration");
+			glcd_tiny_draw_string(0,0,display_str);
+			sprintf(display_str, "Rotate device slowly ");
+			glcd_tiny_draw_string(0,2,display_str);
+			sprintf(display_str, "to cover all points  ");
+			glcd_tiny_draw_string(0,3,display_str);
+			sprintf(display_str, "in grid.  ");
+			glcd_tiny_draw_string(0,4,display_str);
+			break;
+		default:
+			sprintf(display_str, "Hello World");
+			glcd_tiny_draw_string(0,2,display_str);
+			break;
 	}
+	
+	
+
 	sprintf(display_str, "Press any button...");
 	glcd_tiny_draw_string(10,7,display_str);
 	glcd_write();
@@ -971,7 +1121,7 @@ void cal_disp_message(void){
 }
 
 void  fn_disp_cal_report(void){
-	#define maxPages 3
+	#define maxPages 4
 	static uint8_t pageView;
 	if (state_change){
 		pageView = 1;
@@ -989,7 +1139,7 @@ void  fn_disp_cal_report(void){
 		default:
 			break;
 	}
-	glcd_tiny_set_font(Font5x7,5,7,32,127);
+
 	glcd_clear_buffer();
 	sprintf(display_str, "Calibration Report:");
 	glcd_tiny_draw_string(0,0,display_str);
@@ -998,171 +1148,159 @@ void  fn_disp_cal_report(void){
 		///////////////////////// AZM and INC Report
 		case 1:
 			//// Page 1			
-			sprintf(display_str, "Azimuth & Inclination");
+			sprintf(display_str, "Inclination & Azimuth");
 			glcd_tiny_draw_string(0,1,display_str);
 			sprintf(display_str,"20%02x.%02x.%02x@%02x:%02x:%02x",
-				cal_report_azm_inc.time_struct.year, cal_report_azm_inc.time_struct.month, cal_report_azm_inc.time_struct.date,
-				cal_report_azm_inc.time_struct.hours, cal_report_azm_inc.time_struct.minutes, cal_report_azm_inc.time_struct.seconds);
+				cal_report.time_inc_azm.year, cal_report.time_inc_azm.month, cal_report.time_inc_azm.date,
+				cal_report.time_inc_azm.hours, cal_report.time_inc_azm.minutes, cal_report.time_inc_azm.seconds);
 			glcd_tiny_draw_string(0,2,display_str);
-			sprintf(display_str,"4-Point Groups: %d", cal_report_azm_inc.groups);
+			sprintf(display_str,"4-Point Groups: %d", cal_report.groups);
 			glcd_tiny_draw_string(0,3,display_str);
-			sprintf(display_str,"Azm Stdev: %.3f", cal_report_azm_inc.azm_angle_err);
+			sprintf(display_str,"Azm Stdev: %.3f", cal_report.azm_angle_err);
 			glcd_tiny_draw_string(0,5,display_str);
 			glcd_draw_circle(98, 41, 1, BLACK);// Draw degree symbol
-			sprintf(display_str,"Inc Stdev: %.3f", cal_report_azm_inc.inc_angle_err);
+			sprintf(display_str,"Inc Stdev: %.3f", cal_report.inc_angle_err);
 			glcd_tiny_draw_string(0,6,display_str);
 			glcd_draw_circle(98, 49, 1, BLACK);// Draw degree symbol
+			if (options.current_unit_temp==fahrenheit){
+				sprintf(display_str,"Temp: %0.1f F", cal_report.time_inc_azm.temperatureF);
+			}else{
+				sprintf(display_str,"Temp: %0.1f C", cal_report.time_inc_azm.temperatureC);
+			}
+			glcd_tiny_draw_string(0,7,display_str);
 			break;
 		case 2:
 			//// Page 2
-			sprintf(display_str, "Azimuth & Inclination");
+			sprintf(display_str, "Inclination:");
 			glcd_tiny_draw_string(0,1,display_str);
-			// Sensor Disparity
-			sprintf(display_str,"Sensor Delta X,Y,Z%%");
+			sprintf(display_str,"20%02x.%02x.%02x@%02x:%02x:%02x",
+			cal_report.time_inc_azm.year, cal_report.time_inc_azm.month, cal_report.time_inc_azm.date,
+			cal_report.time_inc_azm.hours, cal_report.time_inc_azm.minutes, cal_report.time_inc_azm.seconds);
 			glcd_tiny_draw_string(0,2,display_str);
-			sprintf(display_str,"A:%.3f,%.3f,%.3f",
-				cal_report_azm_inc.disp_stdev_acc[0]*100, cal_report_azm_inc.disp_stdev_acc[1]*100, cal_report_azm_inc.disp_stdev_acc[2]*100);
+			// Sensor Disparity
+			sprintf(display_str,"A1-A2 Delta X,Y,Z %%");
 			glcd_tiny_draw_string(0,3,display_str);
-			sprintf(display_str,"C:%.3f,%.3f,%.3f",
-				cal_report_azm_inc.disp_stdev_comp[0]*100, cal_report_azm_inc.disp_stdev_comp[1]*100, cal_report_azm_inc.disp_stdev_comp[2]*100);
+			sprintf(display_str,"%.3f, %.3f, %.3f",
+				cal_report.disp_stdev_acc[0]*100, cal_report.disp_stdev_acc[1]*100, cal_report.disp_stdev_acc[2]*100);
 			glcd_tiny_draw_string(0,4,display_str);
 			//  Magnitude Error			
 			sprintf(display_str,"Magnitude Error %%");
 			glcd_tiny_draw_string(0,5,display_str);
-			sprintf(display_str,"A1:%.3f A2:%.3f", cal_report_azm_inc.mag_stdev_a1*100, cal_report_azm_inc.mag_stdev_a2*100);
+			sprintf(display_str,"A1:%.3f A2:%.3f", cal_report.mag_stdev_a1*100, cal_report.mag_stdev_a2*100);
 			glcd_tiny_draw_string(0,6,display_str);
-			sprintf(display_str,"C1:%.3f C2:%.3f", cal_report_azm_inc.mag_stdev_c1*100, cal_report_azm_inc.mag_stdev_c2*100);
-			glcd_tiny_draw_string(0,7,display_str);
-		break;
-		//////////////////////// Distance Report
+			break;
 		case 3:
+			//// Page 3
+			sprintf(display_str, "Azimuth");
+			glcd_tiny_draw_string(0,1,display_str);
+			sprintf(display_str,"20%02x.%02x.%02x@%02x:%02x:%02x",
+			cal_report.time_quick_azm.year, cal_report.time_quick_azm.month, cal_report.time_quick_azm.date,
+			cal_report.time_quick_azm.hours, cal_report.time_quick_azm.minutes, cal_report.time_quick_azm.seconds);
+			glcd_tiny_draw_string(0,2,display_str);
+			// Sensor Disparity
+			sprintf(display_str,"M1-M2 Delta X,Y,Z %%");
+			glcd_tiny_draw_string(0,3,display_str);
+			sprintf(display_str,"%.3f, %.3f, %.3f",
+			cal_report.disp_stdev_comp[0]*100, cal_report.disp_stdev_comp[1]*100, cal_report.disp_stdev_comp[2]*100);
+			glcd_tiny_draw_string(0,4,display_str);
+			//  Magnitude Error
+			sprintf(display_str,"Magnitude Error %%");
+			glcd_tiny_draw_string(0,5,display_str);
+			sprintf(display_str,"M1:%.3f M2:%.3f", cal_report.mag_stdev_m1*100, cal_report.mag_stdev_m2*100);
+			glcd_tiny_draw_string(0,6,display_str);
+			break;
+		//////////////////////// Distance Report
+		case 4:
 			sprintf(display_str, "Distance");
 			glcd_tiny_draw_string(0,1,display_str);
 			sprintf(display_str,"20%02x.%02x.%02x@%02x:%02x:%02x",
-				cal_report_dist.time_struct.year, cal_report_dist.time_struct.month, cal_report_dist.time_struct.date,
-				cal_report_dist.time_struct.hours, cal_report_dist.time_struct.minutes, cal_report_dist.time_struct.seconds);
+				cal_report.time_rangeFinder.year, cal_report.time_rangeFinder.month, cal_report.time_rangeFinder.date,
+				cal_report.time_rangeFinder.hours, cal_report.time_rangeFinder.minutes, cal_report.time_rangeFinder.seconds);
 			glcd_tiny_draw_string(0,2,display_str);
 			sprintf(display_str,"Rangefinder Offset:");
 			glcd_tiny_draw_string(0,4,display_str);
 			sprintf(display_str,"  %.4f meters", dist_calst.dist_offset);
 			glcd_tiny_draw_string(0,5,display_str);
-			sprintf(display_str,"  %.4f feet", dist_calst.dist_offset*mt2ft);
+			sprintf(display_str,"  %.4f feet", dist_calst.dist_offset*MT2FT);
 			glcd_tiny_draw_string(0,6,display_str);
 			
 		break;
 	}
 	
 	// Display soft keys
-	if (pageView>1){draw_arrows(2);}//  Draw up arrow at button 2
-	if (pageView<maxPages){draw_arrows(3);}//  Draw up arrow at button 3
-	sprintf(display_str, "Exit");
-	glcd_tiny_draw_string(102,7,display_str);
+	switch (pageView){
+		case 1:
+			drawSoftKeys("","",">","Exit");
+			break;
+		case maxPages:
+			drawSoftKeys("","<","","Exit");
+			break;
+		default:
+			drawSoftKeys("","<",">","Exit");
+			
+	}
+		
 	glcd_write();
 }
 
-
-
-FRESULT save_measurement(struct MEASUREMENT *meas_inst){
-	UINT bw;
-	UINT *pbw;
-	char write_string_temp[511];
-	char write_string_full[511];
-	FRESULT fdebug1, fdebug2, fdebug3;
-	DSTATUS diskio_status;
+void fn_disp_loop_report(void){
+	char unit_str[4];
+	//float total_error;
 	
-	pbw = &bw;
-	
-	//  Format data for text data file
-	sprintf(filename, "20%02x%02x%02x_datafile.csv", current_time.year, current_time.month, current_time.date);
-		
-	fdebug1 = f_open(&file1, filename, FA_OPEN_EXISTING | FA_READ | FA_WRITE);
-	
-	if ((fdebug1!=FR_OK) && (fdebug1!=FR_NO_FILE)){
-		//  Something failed, exit function
-		return fdebug1;
-	}
-	
-	if (fdebug1 == FR_NO_FILE){
-		// File does not exist, create new file with header
-		fdebug2 = f_open(&file1, filename, FA_CREATE_NEW | FA_READ | FA_WRITE);
-		
-		if(fdebug2!=FR_OK){
-			SD_status = fdebug2;
-			return fdebug2;
-		}
-
-		if (options.current_unit_dist == feet){	
-			sprintf(write_string_temp, "Time-Stamp, Index, Distance (meters), Azimuth (degrees), Inclination (degrees), Temperature (Celsius),  Error Log\r\n");
-			fdebug2 = f_write(&file1, write_string_temp, strlen(write_string_temp), pbw);
-		}else{
-			sprintf(write_string_temp, "Time-Stamp, Index, Distance (feet), Azimuth (degrees), Inclination (degrees), Temperature (Fahrenheit), Error Log\r\n");
-			fdebug2 = f_write(&file1, write_string_temp, strlen(write_string_temp), pbw);
-		}
-		
-		
-	}else if(fdebug1 != FR_OK){
-		SD_status = fdebug1;
-		return fdebug1;		
-	}
-	
-	// Format string for timestamps	
-	sprintf(write_string_full,"20%02x.%02x.%02x@%02x:%02x:%02x,",
-		current_time.year, current_time.month, current_time.date,
-		current_time.hours, current_time.minutes, current_time.seconds);
-	// Format string for data
-	sprintf(write_string_temp," %d, %.3f, %.3f, %.3f,",
-		meas_inst->index_ref, meas_inst->distance, meas_inst->azimuth, meas_inst->inclination);
-	strcat(write_string_full, write_string_temp);
-	//  Format string for temperature
 	if (options.current_unit_dist == feet){
-		sprintf(write_string_temp," %.3f,", current_time.temperatureF);
-	}else{
-		sprintf(write_string_temp," %.3f,", current_time.temperatureC);
-	} 
-	strcat(write_string_full, write_string_temp);
-	//Format data for error_log
-	//sprintf(write_string_temp,"Laser: %02x",meas_inst->laser_error_code);
-	strcat(write_string_full, write_string_temp);
-	// Enter line return
-	strcat(write_string_full, "\r\n");
+		strcpy(unit_str,"ft");
+		}else{
+		strcpy(unit_str,"m");
+	}
 	
-	// Append data file
-	fdebug2 = f_lseek(&file1, f_size(&file1));
-	fdebug3 = f_write(&file1, write_string_full, strlen(write_string_full), pbw);
-	f_close(&file1);
-
-	return fdebug3;
+	
+	glcd_clear_buffer();
+	sprintf(display_str, "Loop Test Report:");
+	glcd_tiny_draw_string(0,0,display_str);
+	
+	sprintf(display_str,"Segments: %d",nPoints);
+	glcd_tiny_draw_string(0,1,display_str);
+	
+	sprintf(display_str,"Total Length: %.1f %s", loop_distance, unit_str);
+	glcd_tiny_draw_string(0,2,display_str);
+	
+	sprintf(display_str,"Horz Err: %.3f %s", loop_horizontal, unit_str);
+	glcd_tiny_draw_string(0,3,display_str);
+	
+	sprintf(display_str,"Vert Err: %.3f %s", loop_vertical, unit_str);
+	glcd_tiny_draw_string(0,4,display_str);
+	
+	sprintf(display_str,"  Azim Err: %.1f deg", loop_azimuth);
+	glcd_tiny_draw_string(0,5,display_str);
+	
+	sprintf(display_str,"Loop Err: %.3f%% ", loop_error);
+	glcd_tiny_draw_string(0,5,display_str);
+	
+	
+	
+	glcd_write();
+	
 }
 
-
-FRESULT configure_SD(void){
-	FRESULT fdebug1;
-	//spi_select_slave(&spi_main, &slave_SD, true);
-	sd_mmc_init();
-	
-	disk_status(0);	
-
-	fdebug1 = f_mount(0, &FatFS);
-	//spi_select_slave(&spi_main, &slave_SD, false);
-	
-	return fdebug1;
-}
 
 
 void fn_measure(void){
 	// increment data buffer index
 	data_buf_ind = data_buf_ind+1;
-	if (data_buf_ind >= buf_length){data_buf_ind = 0;}
+	if (data_buf_ind >= NBUFF_MEAS){data_buf_ind = 0;}
 	// Increment reference counter
 	data_ref = data_ref+1;
 	if (data_ref>= 999){data_ref = 1;}
 	data_buf[data_buf_ind].index_ref = data_ref;
 	//  Take measurement	
-	full_measurement(&data_buf[data_buf_ind], true);
+	full_measurement(&data_buf[data_buf_ind], options.shot_delay);
 	//  Save data to SD card
 	save_measurement(&data_buf[data_buf_ind]);
 	//  Turn laser module off
 	rangefinder_on_off(false);
+	//  Send measurement over bluetooth
+	BLE_sendMeas(&data_buf[data_buf_ind]);
+	
 	//  Complete measurement function
 	current_input = input_state_complete;
 }
@@ -1178,7 +1316,7 @@ void fn_aim(void){
 	
 	
 	temp_index = data_buf_ind+1;
-	if(temp_index>=buf_length){temp_index = 0;}
+	if(temp_index>=NBUFF_MEAS){temp_index = 0;}
 	
 	
 	quick_measurement(&data_buf[temp_index]);
@@ -1190,8 +1328,8 @@ void fn_aim(void){
 
 
 void fn_error_info(void){
-	uint8_t i, nErr;
-	static uint8_t shot_list[buf_length+1];
+	uint8_t i;
+	static uint8_t shot_list[NBUFF_MEAS+1];
 	static uint8_t shot_list_ind;
 	static uint8_t nshots;
 	uint8_t temp_buf_ind;
@@ -1202,7 +1340,7 @@ void fn_error_info(void){
 		shot_list_ind = 0;
 		nshots = 0;
 		temp_buf_ind = data_buf_ind;
-		for (i=0;i<buf_length;i++){
+		for (i=0;i<NBUFF_MEAS;i++){
 			if (data_buf[temp_buf_ind].num_errors>0){
 				//  Add shot to list
 				shot_list[shot_list_ind] = temp_buf_ind;
@@ -1210,7 +1348,7 @@ void fn_error_info(void){
 				nshots++;
 			}
 			
-			if (temp_buf_ind == 0){ temp_buf_ind = buf_length-1;}//  Buffer wrap-around
+			if (temp_buf_ind == 0){ temp_buf_ind = NBUFF_MEAS-1;}//  Buffer wrap-around
 			else {temp_buf_ind--;}
 		}
 		
@@ -1239,23 +1377,25 @@ void fn_error_info(void){
 	
 	
 	// Display
-	glcd_tiny_set_font(Font5x7,5,7,32,127);
 	glcd_clear_buffer();
 	//  Display Title
 	sprintf(display_str,"Error Information:");
 	glcd_tiny_draw_string(0,0,display_str);
 	// Display soft keys
-	sprintf(display_str, "Back");
-	glcd_tiny_draw_string(90,7,display_str);
-	if(shot_list_ind>0){draw_arrows(2);}
-	if(shot_list_ind<nshots){draw_arrows(3);}
+	if(shot_list_ind==0){
+		drawSoftKeys("","",">","Back");
+	}else if (shot_list_ind>=nshots){
+		drawSoftKeys("","<","","Back");
+	}else{
+		drawSoftKeys("","<",">","Back");
+	}
 	
 	if(nshots<= shot_list_ind){//  display null message
 		sprintf(display_str,"No Additional Errors");
 		glcd_tiny_draw_string(8,1,display_str);
 		sprintf(display_str,"to Report in Last");
 		glcd_tiny_draw_string(8,2,display_str);
-		sprintf(display_str,"%d Measurements", buf_length);
+		sprintf(display_str,"%d Measurements", NBUFF_MEAS);
 		glcd_tiny_draw_string(8,3,display_str);
 		}else{
 		temp_buf_ind = shot_list[shot_list_ind];
@@ -1282,7 +1422,6 @@ void fn_menu1(void){
 	}
 	
 	
-	glcd_tiny_set_font(Font5x7,5,7,32,127);
 	glcd_clear_buffer();
 	
 	//  Button Handler
@@ -1312,16 +1451,13 @@ void fn_menu1(void){
 			break;
 	}
 	
-	//print soft key text
-	draw_arrows(2);//  Draw up arrow at button 2
-	draw_arrows(3);//  Draw down arrow at button 3
+	//  Title
 	sprintf(display_str, "Menu:");
 	glcd_tiny_draw_string(0,0,display_str);
-	sprintf(display_str, "Enter");
-	glcd_tiny_draw_string(96,0,display_str);
-	sprintf(display_str, "Back");
-	glcd_tiny_draw_string(100,7,display_str);
+	//print soft key text
+	drawSoftKeys("Enter","<",">","Back");
 	
+	//  Write menu entries
 	sprintf(display_str, "Options");
 	glcd_tiny_draw_string(10,1,display_str);
 	
@@ -1375,7 +1511,7 @@ void fn_menu_debug(void){
 	if (state_change) {
 		cur_Y = 2;
 		cur_Y_low = 2;
-		cur_Y_high = 4;
+		cur_Y_high = 6;
 	}
 	
 	// Button Handler
@@ -1396,13 +1532,18 @@ void fn_menu_debug(void){
 			} else if(cur_Y == 4){
 				//  Charger Debug
 				current_input = input_debug_charger;
+			}else if(cur_Y == 5){
+				//  Charger Debug
+				current_input = input_reprocess_inc_azm_cal;
+			}else if(cur_Y == 6){
+				//  Charger Debug
+				current_input = input_reprocess_azm_quick_cal;
 			}
 		default:
 			break;
 	}
 	
 	// Display
-	glcd_tiny_set_font(Font5x7,5,7,32,127);
 	glcd_clear_buffer();
 	//  Display Title
 	sprintf(display_str,"Debug Menu:");
@@ -1410,23 +1551,22 @@ void fn_menu_debug(void){
 	
 	//Display Options
 	sprintf(display_str, "Sensor Raw Data");
-	glcd_tiny_draw_string(20, 2, display_str);
+	glcd_tiny_draw_string(5, 2, display_str);
 	sprintf(display_str, "Backlight Manual");
-	glcd_tiny_draw_string(20, 3, display_str);
+	glcd_tiny_draw_string(5, 3, display_str);
 	sprintf(display_str, "Charger Info");
-	glcd_tiny_draw_string(20, 4, display_str);
+	glcd_tiny_draw_string(5, 4, display_str);
+	sprintf(display_str, "Reprocess Full Cal");
+	glcd_tiny_draw_string(5, 5, display_str);
+	sprintf(display_str, "Reprocess AZM Cal");
+	glcd_tiny_draw_string(5, 6, display_str);
 	
 	// Display soft keys
-	draw_arrows(2);//  Draw up arrow at button 2
-	draw_arrows(3);//  Draw down arrow at button 3
-	sprintf(display_str, "Enter");
-	glcd_tiny_draw_string(96,0,display_str);
-	sprintf(display_str, "Back");
-	glcd_tiny_draw_string(103,7,display_str);
+	drawSoftKeys("Enter","<",">","Back");
 	
 	//Display Pointer
 	sprintf(display_str, ">");
-	glcd_tiny_draw_string(10, cur_Y,display_str);
+	glcd_tiny_draw_string(0, cur_Y,display_str);
 	
 	glcd_write();
 	
@@ -1438,8 +1578,8 @@ void fn_menu_debug(void){
 void fn_menu_cal(void){
 	//  Set initial conditions
 	if (state_change) {
-		cur_Y = 2;
-		cur_Y_low = 2;
+		cur_Y = 1;
+		cur_Y_low = 1;
 		cur_Y_high = 5;
 	}
 	
@@ -1452,25 +1592,47 @@ void fn_menu_cal(void){
 			if(cur_Y < cur_Y_high){++cur_Y; }
 			break;
 		case input_button1:
+			switch (cur_Y){
+				case 1:
+					//  Display Report
+					current_input = input_disp_cal_report;
+					break;
+				case 2:
+					// Perform Loop Test
+					current_input = input_loop_test;
+					break;
+				case 3:
+					//  Perform Compass Quick Cal
+					current_input = input_azm_quick_calibration;
+					break;
+				case 4:
+					//  Accelerometer and Compass Calibration
+					current_input = input_inc_azm_full_calibration;
+					break;
+				case 5:
+					//  Distance Calibration
+					current_input = input_dist_calibration;
+					break;
+					
+				
+				
+				
+			}
 			if (cur_Y==2){
-				//  Display Report
-				current_input = input_disp_cal_report;
+				
 			}else if(cur_Y == 3){
-				//  Distance Calibration
-				current_input = input_dist_calibration;
+				
 				
 			} else if (cur_Y==4){
-				//  Accelerometer and Compass Calibration
-				current_input = input_acc_comp_calibration;
+				
 			} else if (cur_Y==5){
-				current_input = input_loop_test;
+				
 			}
 		default:
 			break;
 	}
 	
 	// Display
-	glcd_tiny_set_font(Font5x7,5,7,32,127);
 	glcd_clear_buffer();
 		//  Display Title
 	sprintf(display_str,"Calibration:");
@@ -1478,58 +1640,53 @@ void fn_menu_cal(void){
 	
 	//Display Options
 	sprintf(display_str, "Display Report");
-	glcd_tiny_draw_string(20, 2, display_str);
-	sprintf(display_str, "Cal Distance");
-	glcd_tiny_draw_string(20, 3, display_str);
-	sprintf(display_str, "Cal AZM & INCL");
-	glcd_tiny_draw_string(20, 4, display_str);
-	sprintf(display_str,"Loop Test");
-	glcd_tiny_draw_string(20, 5, display_str);
+	glcd_tiny_draw_string(5, 1, display_str);
+	sprintf(display_str, "Loop Test");
+	glcd_tiny_draw_string(5, 2, display_str);
+	sprintf(display_str, "CAL: Quick AZM");
+	glcd_tiny_draw_string(5, 3, display_str);
+	sprintf(display_str,"CAL: Full INC&AZM");
+	glcd_tiny_draw_string(5, 4, display_str);
+	sprintf(display_str,"CAL: Range-finder");
+	glcd_tiny_draw_string(5, 5, display_str);
 	
 	// Display soft keys
-	draw_arrows(2);//  Draw up arrow at button 2
-	draw_arrows(3);//  Draw down arrow at button 3
-	sprintf(display_str, "Enter");
-	glcd_tiny_draw_string(96,0,display_str);
-	sprintf(display_str, "Back");
-	glcd_tiny_draw_string(103,7,display_str);
-	
+	drawSoftKeys("Enter","<",">","Back");
+
 	//Display Pointer
 	sprintf(display_str, ">");
-	glcd_tiny_draw_string(10, cur_Y,display_str);
+	glcd_tiny_draw_string(0, cur_Y,display_str);
 	
 	glcd_write();
 	
 }
 
 void fn_debug_backlight(void){
-	static char colorRef;
-	static struct BACKLIGHTCOLOR *colorPtr;
+	static char colorChar;
+	static struct BACKLIGHT_COLOR *colorPtr;
 	//  Set initial conditions
 	if (state_change) {
 		cur_Y = 2;
 		cur_Y_low = 2;
-		cur_Y_high = 5;
-		options.backlight_setting.colorRef = 0;
-		backlightOn();
-		colorPtr = backlightCustomAdjust(0, 0);
+		cur_Y_high = 4;
+		options.backlight_setting.colorRef = 0;//  0 is custom Color
+		backlightOn(&options.backlight_setting);
+		//colorPtr = backlightCustomAdjust(0, 0);
 	}	
 	
 	switch(cur_Y){
 		case 2:
-			colorRef = 'r';
+			colorChar = 'r';
 			break;
 		case 3:
-			colorRef = 'g';
+			colorChar = 'g';
 			break;
 		case 4:
-			colorRef = 'b';
+			colorChar = 'b';
 			break;
-		case 5:
-			colorRef = 'L';
-			break;
+
 		default:
-			colorRef = 'L';
+			colorChar = 'r';
 			break;
 			
 	}	
@@ -1543,10 +1700,10 @@ void fn_debug_backlight(void){
 			if(cur_Y < cur_Y_high){++cur_Y; }
 			break;
 		case input_button2:
-			backlightCustomAdjust(colorRef, 1);
+			colorPtr = backlightCustomAdjust(colorChar, 1);
 			break;
 		case input_button3:
-			backlightCustomAdjust(colorRef, -1);
+			colorPtr = backlightCustomAdjust(colorChar, -1);
 			break;
 		default:
 			break;
@@ -1567,16 +1724,9 @@ void fn_debug_backlight(void){
 	glcd_tiny_draw_string(20, 3, display_str);
 	sprintf(display_str, "Blue:  %d", colorPtr->blue);
 	glcd_tiny_draw_string(20, 4, display_str);
-	sprintf(display_str, "Light: %d", options.backlight_setting.brightness);
-	glcd_tiny_draw_string(20, 5, display_str);
 	
 	// Display soft keys
-	draw_arrows(2);//  Draw up arrow at button 2
-	draw_arrows(3);//  Draw down arrow at button 3
-	sprintf(display_str, "Up");
-	glcd_tiny_draw_string(96,0,display_str);
-	sprintf(display_str, "Down");
-	glcd_tiny_draw_string(103,7,display_str);
+	drawSoftKeys("","Up","Down","");
 	
 	//Display Pointer
 	sprintf(display_str, ">");
@@ -1622,14 +1772,14 @@ void fn_set_options(void){
 				case 3:
 					// Shot Delay
 					options.shot_delay = options.shot_delay+1;
-					if (options.shot_delay>shot_delay_max){options.shot_delay = 0;}
+					if (options.shot_delay>SHOT_DELAY_MAX){options.shot_delay = 0;}
 					save_user_settings();
 					break;
 				case 4:
 					// Charge Current
 					if (options.chargeCurrent == 500){ options.chargeCurrent = 100;}
 					else{options.chargeCurrent = 500;}
-					setup_charger();
+					setChargeCurrent(options.chargeCurrent);
 					save_user_settings();
 					break;
 				case 5:
@@ -1639,12 +1789,12 @@ void fn_set_options(void){
 					break;	
 				case 6:
 					// Backlight Color
-					backlightColorToggle();					
+					backlightColorToggle(&options.backlight_setting);					
 					save_user_settings();
 					break;
 				case 7:
 					// Backlight Color
-					backlightLevelToggle();
+					backlightLevelToggle(&options.backlight_setting);
 					save_user_settings();
 					break;
 				default:
@@ -1656,20 +1806,19 @@ void fn_set_options(void){
 	}
 	
 	// Display
-	glcd_tiny_set_font(Font5x7,5,7,32,127);
 	glcd_clear_buffer();
 	
 	//Display Options
 	if (options.current_unit_dist==feet){
-		sprintf(display_str, "Distance:  Feet");
+		sprintf(display_str, "Dist: Feet");
 	}else{
-		sprintf(display_str, "Distance:  Meters");
+		sprintf(display_str, "Dist: Meters");
 	}
 	glcd_tiny_draw_string(5, 1, display_str);
 	if (options.current_unit_temp==fahrenheit){
-		sprintf(display_str, "Temp:  Fahrenheit");
+		sprintf(display_str, "Temp: Fahrenheit");
 		}else{
-		sprintf(display_str, "Temp:  Celsius");
+		sprintf(display_str, "Temp: Celsius");
 	}
 	glcd_tiny_draw_string(5, 2, display_str);
 	sprintf(display_str,"Shot Delay: %d sec",options.shot_delay);
@@ -1678,7 +1827,7 @@ void fn_set_options(void){
 	glcd_tiny_draw_string(5, 4, display_str);
 	sprintf(display_str,"Err Sens: %0.2f deg", options.errorSensitivity);
 	glcd_tiny_draw_string(5, 5, display_str);
-	sprintf(display_str,"BL Color: %s", backlightGetCurrentColor());
+	sprintf(display_str,"BL Color: %s", backlightGetCurrentColor(&options.backlight_setting));
 	glcd_tiny_draw_string(5, 6, display_str);
 	sprintf(display_str,"BL Level: %d", options.backlight_setting.brightness);
 	glcd_tiny_draw_string(5, 7, display_str);
@@ -1688,12 +1837,7 @@ void fn_set_options(void){
 	glcd_tiny_draw_string(0,0,display_str);
 	
 	// Display soft keys
-	draw_arrows(2);//  Draw up arrow at button 2
-	draw_arrows(3);//  Draw down arrow at button 3
-	sprintf(display_str, "Adjust");
-	glcd_tiny_draw_string(90,0,display_str);
-	sprintf(display_str, "Back");
-	glcd_tiny_draw_string(104,7,display_str);
+	drawSoftKeys("Adjust","<",">","Back");
 	
 	//Display Pointer
 	sprintf(display_str, ">");
@@ -1727,12 +1871,12 @@ void fn_set_bluetooth(void){
 	char str_on[] = "On";
 	char str_off[] = "Off";
 	char *str_ptr;
-	bool current_state;
+	bool pinState;
 	
 	if (state_change) {
 		cur_Y=2;
 		cur_Y_low=2;
-		cur_Y_high=5;
+		cur_Y_high=6;
 		last_input = input_none;
 		
 	}
@@ -1746,30 +1890,25 @@ void fn_set_bluetooth(void){
 			break;
 		case input_button1:
 			if(cur_Y == 2){
-				current_state = ioport_get_pin_level(BLE_autorun);
-				ioport_set_pin_level(BLE_autorun, !current_state);
+				pinState = ioport_get_pin_level(BLE_autorun);
+				ioport_set_pin_level(BLE_autorun, !pinState);
 			} else if (cur_Y==3){
-				current_state = ioport_get_pin_level(BLE_reset);
-				ioport_set_pin_level(BLE_reset, !current_state);
+				pinState = ioport_get_pin_level(BLE_reset);
+				ioport_set_pin_level(BLE_reset, !pinState);
 			} else if (cur_Y==4){
-				current_state = ioport_get_pin_level(BLE_ota);
-				ioport_set_pin_level(BLE_ota, !current_state);		
+				pinState = ioport_get_pin_level(BLE_ota);
+				ioport_set_pin_level(BLE_ota, !pinState);		
 			} else if (cur_Y==5){
-				if (USART_BLE_enabled){
-					USART_BLE_enabled = false;
+				if (isBleCommEnabled()){
 					usart_disable(&usart_BLE);
-					ioport_set_pin_dir(MCU_RTS1, IOPORT_DIR_OUTPUT);
-					ioport_set_pin_level(MCU_RTS1, false);
-					ioport_set_pin_dir(MCU_CTS1, IOPORT_DIR_INPUT);
-					ioport_reset_pin_mode(MCU_TX1);
-					ioport_reset_pin_mode(MCU_RX1);
-					ioport_set_pin_dir(MCU_TX1, IOPORT_DIR_INPUT);
-					ioport_set_pin_dir(MCU_RX1, IOPORT_DIR_INPUT);
+					BLE_usart_isolate();
 				}else{
-					USART_BLE_enabled = true;
-					configure_usart();
+					configure_usart_BLE();
 				}
 				
+			}else if (cur_Y==6){
+				pinState = ioport_get_pin_level(BLE_COMMAND_MODE);
+				ioport_set_pin_level(BLE_COMMAND_MODE, !pinState);
 			}
 		default:
 			break;
@@ -1777,8 +1916,10 @@ void fn_set_bluetooth(void){
 
 
 	
-	glcd_tiny_set_font(Font5x7,5,7,32,127);
 	glcd_clear_buffer();
+	//  Display Title
+	sprintf(display_str,"Bluetooth:");
+	glcd_tiny_draw_string(0,0,display_str);
 	
 	//Display Options
 	sprintf(display_str,"AutoRun On/Off");
@@ -1789,12 +1930,11 @@ void fn_set_bluetooth(void){
 	glcd_tiny_draw_string(25, 4, display_str);
 	sprintf(display_str,"MC UART On/Off");
 	glcd_tiny_draw_string(25, 5, display_str);
+	sprintf(display_str,"CMD MODE");
+	glcd_tiny_draw_string(25, 6, display_str);
 	
 	// Display soft keys
-	sprintf(display_str,"Bluetooth:     Adjust");
-	glcd_tiny_draw_string(0,0,display_str);
-	sprintf(display_str, "Back");
-	glcd_tiny_draw_string(96,7,display_str);
+	drawSoftKeys("Adjust","<",">","Back");
 	
 	//Display Pointer
 	sprintf(display_str, ">");
@@ -1810,9 +1950,12 @@ void fn_set_bluetooth(void){
 	if (ioport_get_pin_level(BLE_ota)){ str_ptr = str_on;}
 	else{str_ptr = str_off;}
 	glcd_tiny_draw_string(0, 4,str_ptr);
-	if (USART_BLE_enabled){ str_ptr = str_on;}
+	if (isBleCommEnabled()){ str_ptr = str_on;}
 	else{str_ptr = str_off;}
 	glcd_tiny_draw_string(0, 5,str_ptr);
+	if (ioport_get_pin_level(BLE_COMMAND_MODE)){ str_ptr = str_on;}
+	else{str_ptr = str_off;}
+	glcd_tiny_draw_string(0, 6,str_ptr);
 	
 
 	
@@ -1822,7 +1965,7 @@ void fn_set_bluetooth(void){
 
 
 void fn_set_clock(void){
-	uint8_t i, unitMax, unitMin, temp;
+	uint8_t i, unitMax, unitMin;
 	uint8_t *unitPtr;
 	// Used for setting clock
 	typedef struct {
@@ -1880,7 +2023,6 @@ void fn_set_clock(void){
 			//  input_button4 aborts t
 	}
 	
-	glcd_tiny_set_font(Font5x7,5,7,32,127);
 	glcd_clear_buffer();
 	
 	sprintf(display_str,"Set Clock:");
@@ -1899,14 +2041,7 @@ void fn_set_clock(void){
 	glcd_tiny_draw_string(10,6,display_str);
 	
 	// Display soft keys
-	sprintf(display_str, "+");
-	glcd_tiny_draw_string(121,3,display_str);
-	sprintf(display_str, "-");
-	glcd_tiny_draw_string(121,5,display_str);
-	sprintf(display_str, "Next");
-	glcd_tiny_draw_string(103,0,display_str);
-	sprintf(display_str, "Cancel");
-	glcd_tiny_draw_string(92,7,display_str);
+	drawSoftKeys("Next","+","-","Cancel");
 	
 	//Display Pointer
 	sprintf(display_str, ">");
@@ -1926,10 +2061,10 @@ void fn_main_display(void){
 	
 	//Handle Button Inputs
 	if(last_input==input_button2){
-		backlightPlus();
+		backlightPlus(&options.backlight_setting);
 		save_user_settings();
 	}else if(last_input==input_button3){
-		backlightMinus();
+		backlightMinus(&options.backlight_setting);
 			save_user_settings();
 	}
 	
@@ -1941,13 +2076,12 @@ void print_data_screen(void){
 	get_time();
 	isCharging = getChargerStatus();
 	
-	glcd_tiny_set_font(Font5x7,5,7,32,127);
 	glcd_clear_buffer();
 	
 	if (options.current_unit_temp == fahrenheit){
 		sprintf(display_str,"T:%4.1fF", current_time.temperatureF);
 	}else{
-		sprintf(display_str,"T:%4.1fC", current_time.temperatureC);
+		sprintf(display_str,"T:%0.1fC", current_time.temperatureC);
 	}
 	
 	glcd_tiny_draw_string(86,7,display_str);
@@ -1959,11 +2093,12 @@ void print_data_screen(void){
 	
 	//  Draw Charge Status	
 	if (isCharging){
-		if (flipper){
-			flipper = false;
-		}else{
-			flipper = true;
-		}
+		flipper = !flipper;
+		//if (flipper){
+		//	flipper = false;
+		//}else{
+		//	flipper = true;
+		//}
 		//  Draw lines
 		glcd_draw_line(49, 64, 49, 54, BLACK);
 		glcd_draw_line(49, 54, 83, 54, BLACK);
@@ -2024,9 +2159,9 @@ void print_data_screen(void){
 		}
 		//Set index for buffer wrap-around
 		if (temp_index<0){
-			temp_index = buf_length+temp_index;
-			}else if(temp_index>=buf_length){
-			temp_index = temp_index-buf_length;
+			temp_index = NBUFF_MEAS+temp_index;
+			}else if(temp_index>=NBUFF_MEAS){
+			temp_index = temp_index-NBUFF_MEAS;
 		}
 		//print lines
 		if ((temp_ref)>0){
@@ -2036,7 +2171,7 @@ void print_data_screen(void){
 			if((current_state==st_main_display)||(i>0)){//do not print reference and distance for active reading
 				sprintf(display_str, "%d", data_buf[temp_index].index_ref);//reference
 				glcd_draw_string_xy(x1, y_temp, display_str);
-				sprintf(display_str, "%.1f", data_buf[temp_index].distance);//distance
+				sprintf(display_str, "%.1f", data_buf[temp_index].distCal);//distance
 				glcd_draw_string_xy(x2, y_temp, display_str);
 				
 				//  Add Error message if necessary
@@ -2070,24 +2205,6 @@ void print_data_screen(void){
 	
 	glcd_write();
 }
-
-void draw_arrows(uint8_t button){
-	//draw menu up/down arrows
-	switch(button){
-		case 2: //  Display arrow at button 2
-			glcd_draw_line(116, 26, 120, 22, BLACK);
-			glcd_draw_line(120, 22, 124, 26, BLACK);
-			break;
-		case 3: // Display arrow at button 3
-			glcd_draw_line(116, 40, 120, 44, BLACK);
-			glcd_draw_line(120, 44, 124, 40, BLACK);
-			break;
-		default:
-			break;
-	}
-	
-}
-
 
 
 void fn_aim_abort(void){
@@ -2136,19 +2253,17 @@ void config_pins_powerup(void){
 	ioport_set_pin_level(mag2_SS, true);
 	ioport_set_pin_dir(SD_CS, IOPORT_DIR_OUTPUT);
 	ioport_set_pin_level(SD_CS, true);
-	ioport_set_pin_dir(BLE_SS, IOPORT_DIR_OUTPUT);
-	ioport_set_pin_level(BLE_SS, true);
 	//UART Pins
 	//ioport_set_pin_dir(MCU_RTS1, IOPORT_DIR_OUTPUT);
 	//ioport_set_pin_level(MCU_RTS1, false);
 	//ioport_set_pin_dir(MCU_CTS1, IOPORT_DIR_INPUT);
 	//BLE pins
-	ioport_set_pin_dir(BLE_ota, IOPORT_DIR_OUTPUT);
-	ioport_set_pin_level(BLE_ota, false);// low to disable programming over BLE
-	ioport_set_pin_dir(BLE_autorun, IOPORT_DIR_OUTPUT);
-	ioport_set_pin_level(BLE_autorun, true);//low for autorun enabled, high for development mode
-	ioport_set_pin_dir(BLE_reset, IOPORT_DIR_OUTPUT);
-	ioport_set_pin_level(BLE_reset, false); //low, hold in reset
+	//ioport_set_pin_dir(BLE_ota, IOPORT_DIR_OUTPUT);
+	//ioport_set_pin_level(BLE_ota, false);// low to disable programming over BLE
+	//ioport_set_pin_dir(BLE_autorun, IOPORT_DIR_OUTPUT);
+	//ioport_set_pin_level(BLE_autorun, true);//low for autorun enabled, high for development mode
+	//ioport_set_pin_dir(BLE_reset, IOPORT_DIR_OUTPUT);
+	//ioport_set_pin_level(BLE_reset, false); //low, hold in reset
 	//miscellaneous
 	ioport_set_pin_dir(laser_reset, IOPORT_DIR_OUTPUT);
 	ioport_set_pin_level(laser_reset, false);
@@ -2178,6 +2293,8 @@ void config_pins_powerdown(void){
 	ioport_reset_pin_mode(MCU_RX1);
 	ioport_reset_pin_mode(MCU_RX2);
 	ioport_set_pin_dir(MCU_TX1, IOPORT_DIR_INPUT);
+	//ioport_set_pin_dir(MCU_TX1, IOPORT_DIR_OUTPUT);
+	//ioport_set_pin_level(MCU_TX1, false);
 	ioport_set_pin_dir(MCU_TX2, IOPORT_DIR_INPUT);
 	ioport_set_pin_dir(MCU_RX1, IOPORT_DIR_INPUT);
 	ioport_set_pin_dir(MCU_RX2, IOPORT_DIR_INPUT);
@@ -2192,11 +2309,11 @@ void config_pins_powerdown(void){
 	ioport_set_pin_dir(LCD_SPI_SS_PIN , IOPORT_DIR_INPUT);
 	ioport_set_pin_dir(LCD_SPI_DC_PIN , IOPORT_DIR_INPUT);
 	ioport_set_pin_dir(LCD_SPI_RST_PIN , IOPORT_DIR_INPUT);
-	ioport_set_pin_dir(BLE_autorun, IOPORT_DIR_INPUT);
-	ioport_set_pin_dir(BLE_ota, IOPORT_DIR_INPUT);
-	ioport_set_pin_dir(BLE_SS, IOPORT_DIR_INPUT);
-	ioport_set_pin_level(BLE_reset, false);
-	ioport_set_pin_level(BLE_SS, true);
+	//ioport_set_pin_dir(BLE_autorun, IOPORT_DIR_INPUT);
+	//ioport_set_pin_dir(BLE_ota, IOPORT_DIR_INPUT);
+	//ioport_set_pin_dir(BLE_SS, IOPORT_DIR_INPUT);
+	//ioport_set_pin_level(BLE_reset, false);
+	ioport_set_pin_level(BLE_COMMAND_MODE, false);
 }
 
 
@@ -2265,13 +2382,13 @@ void extint_routine(void)
 	//cpu_irq_disable();
 	
 	
-	current_time_ms = rtc_count_get_count(&rtc1);
+	current_time_ms = getCurrentMs(); 
 	
 	
 
 	switch (extint_get_current_channel()){
 		case 5:
-			tempInput = externalButtonRoutine(!ioport_get_pin_level(buttonE));
+			tempInput = externalButtonRoutine(!ioport_get_pin_level(buttonE), current_time_ms);
 			break;
 		case 7:
 			tempInput = input_button4;
@@ -2297,9 +2414,6 @@ void extint_routine(void)
 		if((current_time_ms-last_time_ms)>DEBOUNCE_MS){
 			last_time_ms = current_time_ms;	
 			current_input = tempInput;
-			// debug
-			//debug4 = debug3;
-			//debug3 = current_time_ms-last_time_ms;
 		}
 	}
 	//cpu_irq_enable();
@@ -2307,60 +2421,69 @@ void extint_routine(void)
 	
 }
 
-enum INPUT externalButtonRoutine(bool buttonOn){
+enum INPUT externalButtonRoutine(bool buttonOn, uint32_t current_time_ms){
 	// Button External
 	// Special Routines for External Button
 	// If held down for less than X seconds, provides normal input upon release
 	// If held down for more than X seconds, a separate interrupt routine provides powerdown input
 	// When in powerdown state, 3 quick clicks through a separate interrupt routine provides powerup input
 	static uint32_t last_time_ms;
-	uint32_t current_time_ms;
+	
 	static uint8_t click_counter=0;
 	
-	if (current_state == st_powerdown){
-		//  wakup on 3 quick clicks
-		if (buttonOn){//if external button is pressed
-			current_time_ms = rtc_count_get_count(&rtc1);
-			if(  ((current_time_ms-last_time_ms)<QUICK3_MS)&
-				((current_time_ms-last_time_ms)>(DEBOUNCE_MS/4)) ){
+	
+	switch (current_state){
+		case st_powerup:
+			//  Ignore external button inputs during powerup
+			return input_none;
+			break;
+		case st_powerdown:
+			//  Special Routine to wake up from sleep
+			
+			//  Debounce function
+			//  Lower debounce time than normal
+			if ((current_time_ms-last_time_ms)<DEBOUNCE_MS_QUICK3){
+				return input_none;
+			}
+			
+			//  Find out if click counter will be incremented
+			if( (current_time_ms-last_time_ms)<QUICK3_MS){
+				//  Clicked within necessary time interval, add to click counter.
 				click_counter++;
 			}else{
+				//  Not fast enough, record as first click
 				click_counter = 1;
 			}
 			last_time_ms = current_time_ms;
-		}
-		if (click_counter>=3){
-			click_counter = 0;
-			return input_wakeup;
 			
-		}else{
-			return input_none;	
-		}
-		
-	}
-	
-	if (current_state == st_powerup){
-		//  Ignore external button inputs during powerup
-		return input_none;	
-	}
-	
-	if (buttonOn){
-		//  Trigger on if button is pressed
-		if(!buttonE_triggered){
-			buttonE_triggered=true;
-			//trigger timer
-			tc_set_count_value(&timer1, 0);
-			tc_start_counter(&timer1);
-		}
-		return input_none;
-		
-	}else{
-		//  Releaed in a short amount of time, normal input
-		buttonE_triggered=false;
-		tc_stop_counter(&timer1);
-		return input_buttonE;	
-		
-	}
+			
+			//  See if enough clicks have occurred
+			if (click_counter>=3){
+				click_counter = 0;
+				return input_wakeup;
+				
+			}else{
+				return input_none;
+			}			
+			break;
+		default:
+			if (buttonOn){
+				//  Trigger on if button is pressed
+				if(!buttonE_triggered){
+					buttonE_triggered=true;
+					//trigger timer
+					timerStartExt();
+				}
+				return input_none;
+			}else{
+				//  Releaed in a short amount of time, normal input
+				buttonE_triggered=false;
+				timerStopExt();
+				return input_buttonE;
+			}
+
+	}//  End Switch Statement
+
 	
 		
 }
@@ -2368,24 +2491,29 @@ enum INPUT externalButtonRoutine(bool buttonOn){
 
 
 void fn_powerdown(void){
-	enum sleepmgr_mode sleep_mode;
+
 	if (state_change){
 		// Disable watchdog timer
 		wdt_disable();
 		//  Switch-Over to low power internal clock
-		clock_32k_source(clock_int);
 		ext_osc_onoff(false);
 		//  Put hardware in low-power state
 		disable_comms();
 		config_pins_powerdown();		
 		ioport_set_pin_level(V2_enable, false);//disable V2 power supply		
-		configure_timers(st_powerdown);//Disable TC	
+		//configure_timers(st_powerdown);//Disable TC	
+		udc_stop();// disable USB
+		powerdown_timer_1s();
+		powerdown_timer_ExtLong();
+		
+		//  Setup GCLK 0 for low power 32 khz
+		mainClockPowerdown();
 		
 	};	
-	udc_stop();// disable USB
 	
-	sleepmgr_sleep(SLEEPMGR_IDLE);
-	//sleepmgr_enter_sleep();
+	
+	sleepmgr_sleep(SLEEPMGR_STANDBY);
+
 	
 }
 
@@ -2393,18 +2521,14 @@ void fn_powerup(void){
 	config_pins_powerup();
 	delay_ms(100);
 	
-	//Debug////////////
-	debugRTC = rtc_count_get_count(&rtc1);
-	////////////////
-	setup_spi();
-	configure_i2c_master();
-	configure_usart();
-	configure_usart_callbacks();	
-	//Debug////////////
-	debugRTC = rtc_count_get_count(&rtc1);
-	////////////////
+	//  Setup GCLK 0 for 48MHZ
+	mainClockPowerup();
+	//  Various setups
+	enable_comms();
+	
+	
 	load_user_settings();//  Needed for backlight setting
-	backlightOn();
+	backlightOn(&options.backlight_setting);
 	configure_extint_channel();
 	configure_extint_callbacks();
 	setup_accel(&slave_acc1);
@@ -2412,41 +2536,39 @@ void fn_powerup(void){
 	setup_mag(&slave_mag1);
 	setup_mag(&slave_mag2);
 	rangefinder_on_off(false);	
-	//Debug////////////
-	debugRTC = rtc_count_get_count(&rtc1);
-	////////////////
+	
+	//  Turn on external clock and take it as a source
 	ext_osc_onoff(true);
 	delay_ms(10);	
-	setup_XOSC32k();
-	clock_32k_source(clock_ext);	
-	configure_timers(st_powerup);
-	delay_ms(10);
-	//Debug////////////
-	debugRTC = rtc_count_get_count(&rtc1);
-	////////////////
-	configure_SD();
-	
-	ioport_reset_pin_mode(BLE_ota);//  Needed to reset pin mode; set in some previous initialization
-	ioport_set_pin_dir(BLE_ota, IOPORT_DIR_OUTPUT);//  Needed to reset pin mode; set in some previous initialization
-	ioport_set_pin_level(BLE_ota, false);//  Needed to reset pin mode; set in some previous initialization
-	
-	wdt_enable();
-	
-	delay_ms(500);
-	//config_spi(LCD);
+
+	//  Initialize LCD controller
+	delay_ms(500);  //  Delay requested by LCD controller
 	glcd_init();
-	buttonE_triggered=false;
-	current_input = input_state_complete;
-	//Debug////////////
-	debugRTC = rtc_count_get_count(&rtc1);
-	////////////////
+	glcd_tiny_set_font(Font5x7,5,7,32,127);//  All font in "tiny" mode
+	
+	//  Setup background timers
+	wdt_enable();
+	configure_timer_1s();
+	configure_timer_ExtLong();
+	
+	//  Bluetooth Init
+	//BLE_init();
 	
 	
-	system_interrupt_enable_global();
-	
+	//  Startup USB mass storage
+	system_interrupt_enable_global();	
 	irq_initialize_vectors();
 	cpu_irq_enable();
+	configure_SD();
 	udc_start();
+	
+	
+	
+	//  Set initial conditions for state machine
+	buttonE_triggered=false;//  In case button was pressed again during powerup
+	current_input = input_state_complete;
+	
+	
 	
 }
 
@@ -2461,13 +2583,14 @@ void getDefaultOptions(struct OPTIONS *optionptr){
 	optionptr->errorSensitivity = 1;
 	optionptr->backlight_setting.colorRef = 1;//white
 	optionptr->backlight_setting.brightness = 3;
-	optionptr->backlight_setting.maxColor = 30;
-	optionptr->backlight_setting.maxBrightness = 5;
-	
-	optionptr->Settings_Initialized_Key = 0xC9;//  Indicator that settings have been initialized
+	optionptr->SerialNumber = 0;
+	optionptr->Settings_Initialized_Key = 0xC3;//  Indicator that settings have been initialized
 
 	
 }
+
+
+
 
 void msc_notify_trans(void){
 	

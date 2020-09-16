@@ -11,6 +11,12 @@
 #ifndef FONT5X7_H_
 #define FONT5X7_H_
 
+#include "glcd\glcd.h"
+//debug
+#define PROGMEM
+//debug
+
+
 // standard ascii 5x7 font
 // defines ascii characters 0x20-0x7F (32-127)
 static const char Font5x7[] PROGMEM = {

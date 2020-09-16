@@ -11,6 +11,7 @@
 #include <asf.h>
 #include <clockSetup.h>
 
+
 #define lcd_SS	IOPORT_CREATE_PIN(IOPORT_PORTA, 23)//CS6
 #define acc1_SS	IOPORT_CREATE_PIN(IOPORT_PORTA, 18)//CS1
 #define acc2_SS	IOPORT_CREATE_PIN(IOPORT_PORTA, 19)//CS2
@@ -35,16 +36,20 @@
 #define baudMaxSD		10000000
 #define baudMaxDisp		 2500000
 #define baudMaxAcc		 2500000
-#define baudMaxComp		 2500000//  Could not find in datasheet
+#define baudMaxComp		 1000000
+#define baudRateMin		baudMaxComp
+#define baudRateMax		baudMaxSD
 
 
 enum read_write {readp, writep};
 enum spi_device	{LCD, sensors, SD_card};
 //Disable comms
 void disable_comms(void);
+void enable_comms(void);
 
 
 // SPI setup
+void spi_setBaud(uint32_t );
 void setup_spi(void);
 //void config_spi(enum spi_device);
 struct spi_module spi_main; //Master software module
@@ -77,25 +82,26 @@ enum LASER_MESSAGE_TYPE{
 	BEEP_ON_OFF = 0x47,
 };
 
-volatile uint8_t rxBufferLaser[20];
-volatile uint8_t rxBufferLaserIndex;
-volatile uint8_t rxBufferSpi[100];
-volatile uint8_t rxBufferSpiIndex;
-volatile uint8_t debugBuffer[200];
-volatile uint8_t debugBufferIndex;
+
 enum LASER_MESSAGE_TYPE laserMessageType(void);
 struct usart_module usart_laser;
 struct usart_module usart_BLE;
 enum status_code writeLaser(uint8_t *tx_data,uint16_t length);
+enum status_code writeBle(uint8_t *tx_data,uint16_t length);
 void readLaserCallback(struct usart_module *const usart_module);
 void writeLaserCallback(struct usart_module *const usart_module);
-void configure_usart(void);
-void configure_usart_callbacks(void);
+void readBleCallback(struct usart_module *const usart_module);
+void writeBleCallback(struct usart_module *const usart_module);
+void configure_usart_Laser(void);
+void configure_usart_BLE(void);
+void BLE_usart_isolate(void);
+bool isBleCommEnabled(void);
 bool isLaserTransmitComplete(void);
 bool isLaserReceiveComplete(void);
+bool isBleTransmitComplete(void);
+bool isBleReceiveComplete(void);
 void rxBufferLaserClear(void);
-//  Laser Message Types
-
+void rxBufferBleClear(void);
 
 
 // I2C setup
@@ -116,7 +122,7 @@ void adp5062_reg_read_write(enum read_write, uint8_t , uint8_t *);
 
 
 
-
+//#include <main.h>
 
 
 

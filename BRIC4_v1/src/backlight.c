@@ -9,132 +9,125 @@
 #include <backlight.h>
 
 
-extern struct OPTIONS options;
-
-
 char colorStrWhite[]	= "White ";
-char colorStrRed[]	= "Red   ";
-char colorStrBlue[]	= "Blue  ";
+char colorStrRed[]		= "Red   ";
+char colorStrBlue[]		= "Blue  ";
 char colorStrGreen[]	= "Green ";
-char colorStrPurple[] = "Purple";
-char colorStrCyan[]	= "Cyan  ";
-char colorStrCustom[] = "custom";
+char colorStrPurple[]	= "Purple";
+char colorStrCyan[]		= "Cyan  ";
+char colorStrCustom[]	= "custom";
 
-struct BACKLIGHTCOLOR colorCustom	= {.colorStringPtr = colorStrCustom,	.red = 15, .green = 15, .blue = 15};
-struct BACKLIGHTCOLOR colorWhite	= {.colorStringPtr = colorStrWhite,		.red = 22, .green = 30, .blue = 30};
-struct BACKLIGHTCOLOR colorRed		= {.colorStringPtr = colorStrRed,		.red = 30, .green =  0, .blue = 0};
-struct BACKLIGHTCOLOR colorBlue		= {.colorStringPtr = colorStrBlue,		.red = 0,  .green =  8, .blue = 30};
-struct BACKLIGHTCOLOR colorGreen	= {.colorStringPtr = colorStrGreen,		.red = 0,  .green = 30, .blue = 0};
-struct BACKLIGHTCOLOR colorPurple	= {.colorStringPtr = colorStrPurple,	.red = 30, .green =  4, .blue = 30};
-struct BACKLIGHTCOLOR colorCyan		= {.colorStringPtr = colorStrCyan,		.red = 0,  .green = 30, .blue = 24};
+struct BACKLIGHT_COLOR colorCustom	= {.colorStringPtr = colorStrCustom,	.red = 15, .green = 15, .blue = 15};
+struct BACKLIGHT_COLOR colorWhite	= {.colorStringPtr = colorStrWhite,		.red = 22, .green = 30, .blue = 30};
+struct BACKLIGHT_COLOR colorRed		= {.colorStringPtr = colorStrRed,		.red = 30, .green =  0, .blue = 0};
+struct BACKLIGHT_COLOR colorBlue	= {.colorStringPtr = colorStrBlue,		.red = 0,  .green =  8, .blue = 30};
+struct BACKLIGHT_COLOR colorGreen	= {.colorStringPtr = colorStrGreen,		.red = 0,  .green = 30, .blue = 0};
+struct BACKLIGHT_COLOR colorPurple	= {.colorStringPtr = colorStrPurple,	.red = 30, .green =  4, .blue = 30};
+struct BACKLIGHT_COLOR colorCyan	= {.colorStringPtr = colorStrCyan,		.red = 0,  .green = 30, .blue = 24};
 
 
-struct BACKLIGHTCOLOR *colorOptions[] = {&colorCustom, &colorWhite, &colorRed, &colorBlue, &colorGreen, &colorPurple, &colorCyan, };
+struct BACKLIGHT_COLOR *colorOptions[] = {&colorCustom, &colorWhite, &colorRed, &colorBlue, &colorGreen, &colorPurple, &colorCyan, };
 
 //Backlight Settings
 #define LED_MAX 225 //93%; limited by driver current limit per datasheet
 
 
 
-struct BACKLIGHTCOLOR * backlightCustomAdjust(char refColor, int8_t adjustment){
+struct BACKLIGHT_COLOR * backlightCustomAdjust(char color, int8_t adjustment){
 	uint8_t * colorPtr;
-	uint8_t maxRef;
 	
-	switch (refColor){
+	switch (color){
 		case 'r':
 			colorPtr = &colorCustom.red;
-			maxRef = options.backlight_setting.maxColor;
 			break;
 		case 'b':
 			colorPtr = &colorCustom.blue;
-			maxRef = options.backlight_setting.maxColor;
 			break;
 		case 'g':
 			colorPtr = &colorCustom.green;
-			maxRef = options.backlight_setting.maxColor;
 			break;	
-		case 'L':
-			colorPtr = &options.backlight_setting.brightness;
-			maxRef = options.backlight_setting.maxBrightness;
-			break;
 		default:
-			colorPtr = &options.backlight_setting.brightness;
-			maxRef = options.backlight_setting.maxBrightness;
+			colorPtr = &colorCustom.red;
 	}
 	
 	if (adjustment>0){
-		if (*colorPtr<maxRef){
-			*colorPtr = *colorPtr+adjustment;
+		if (*colorPtr < COLOR_MAX){
+			(*colorPtr)++;
 		}
 	}else if (adjustment<0){
 		if (*colorPtr>0){
-			*colorPtr = *colorPtr+adjustment;
+			(*colorPtr)--;
 		}
 	}
 	
-	backlightOn();
-	
 	return &colorCustom;
 	
+	
 }
 
 
-void backlightColorToggle(void){
-	options.backlight_setting.colorRef++;
-	if (options.backlight_setting.colorRef>=(sizeof(colorOptions)/sizeof(&colorCustom))){
-		options.backlight_setting.colorRef = 1;
+void backlightColorToggle(struct BACKLIGHT_SETTING *blset){
+	blset->colorRef ++;
+
+	if ((blset->colorRef) >= (sizeof(colorOptions)/sizeof(&colorCustom))){
+		blset->colorRef = 1;
 	}
-	backlightOn();
+	backlightOn(blset);
 	
 }
 
-void backlightPlus(void){
-	if (options.backlight_setting.brightness<options.backlight_setting.maxBrightness){
-		options.backlight_setting.brightness = options.backlight_setting.brightness+1;
-	}	
-	backlightOn();
-}
-
-void backlightMinus(void){	
-	if (options.backlight_setting.brightness>0){
-		options.backlight_setting.brightness = options.backlight_setting.brightness-1;
+void backlightPlus(struct BACKLIGHT_SETTING *blset){
+	
+	
+	
+	if ((blset->brightness) < BRIGHT_MAX){
+		blset->brightness++;
 	}
-	backlightOn();
-	
+	backlightOn(blset);
 }
 
-void backlightLevelToggle(void){
-	options.backlight_setting.brightness = options.backlight_setting.brightness+1;
+void backlightMinus(struct BACKLIGHT_SETTING *blset){	
+
 	
-	if (options.backlight_setting.brightness>options.backlight_setting.maxBrightness){
-		options.backlight_setting.brightness = 0;
+	if ((blset->brightness) > 0){
+		blset->brightness--;
 	}
-	backlightOn();
+	backlightOn(blset);
 	
 }
 
-char* backlightGetCurrentColor(void){
-	return colorOptions[options.backlight_setting.colorRef]->colorStringPtr;	
+void backlightLevelToggle(struct BACKLIGHT_SETTING *blset){
+	blset->brightness++;
+	
+	
+	if ((blset->brightness) > BRIGHT_MAX){
+		blset->brightness = 0;
+	}
+	backlightOn(blset);
+	
 }
 
-void backlightOn(void){
-	backlight_level(&options.backlight_setting);	
+char* backlightGetCurrentColor(struct BACKLIGHT_SETTING *blset){
+	char *strPtr;
+	strPtr = colorOptions[blset->colorRef]->colorStringPtr;
+	return strPtr;	
 }
 
 
-void backlight_level(struct BACKLIGHT_SETTING *blset){
+
+void backlightOn(struct BACKLIGHT_SETTING *blset){
 	uint8_t u8blue, u8green, u8red;
-	float fred, fblue, fgreen;
+	float fred, fblue, fgreen, brightness;
 	float scale;
 	
 	fred = colorOptions[blset->colorRef]->red;
 	fgreen = colorOptions[blset->colorRef]->green;
-	fblue = colorOptions[blset->colorRef]->blue;
-	
+	fblue = colorOptions[blset->colorRef]->blue;	
+	brightness = blset->brightness;
 	
 	
 	scale = 1/(fred+fgreen+fblue);
-	scale = scale*blset->brightness/blset->maxBrightness;
+	scale = (scale*brightness)/BRIGHT_MAX;
 	fred = scale*fred;
 	fblue = scale*fblue;
 	fgreen = scale*fgreen;

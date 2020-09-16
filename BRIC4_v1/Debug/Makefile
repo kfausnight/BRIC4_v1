@@ -161,8 +161,12 @@ C_SRCS +=  \
 ../src/ASF/thirdparty/fatfs/fatfs-r0.09/src/option/ccsbcs.c \
 ../src/backlight.c \
 ../src/batteryManagement.c \
+../src/BLE_func.c \
 ../src/clockSetup.c \
+../src/dispFunctions.c \
 ../src/EEPROM.c \
+../src/mathBRIC.c \
+../src/SDcardBRIC.c \
 ../src/sensors.c \
 ../src/timers.c \
 ../src/ASF/common2/components/memory/sd_mmc/sd_mmc.c \
@@ -189,7 +193,6 @@ C_SRCS +=  \
 ../src/glcd/ST7565R.c \
 ../src/glcd/text.c \
 ../src/glcd/text_tiny.c \
-../src/glcd/unit_tests.c \
 ../src/ASF/sam0/drivers/sercom/usart/usart.c \
 ../src/ASF/sam0/drivers/sercom/spi/spi.c \
 ../src/ASF/sam0/drivers/sercom/sercom.c \
@@ -229,8 +232,12 @@ src/ASF/thirdparty/fatfs/fatfs-r0.09/src/ff.o \
 src/ASF/thirdparty/fatfs/fatfs-r0.09/src/option/ccsbcs.o \
 src/backlight.o \
 src/batteryManagement.o \
+src/BLE_func.o \
 src/clockSetup.o \
+src/dispFunctions.o \
 src/EEPROM.o \
+src/mathBRIC.o \
+src/SDcardBRIC.o \
 src/sensors.o \
 src/timers.o \
 src/ASF/common2/components/memory/sd_mmc/sd_mmc.o \
@@ -257,7 +264,6 @@ src/glcd/graphs.o \
 src/glcd/ST7565R.o \
 src/glcd/text.o \
 src/glcd/text_tiny.o \
-src/glcd/unit_tests.o \
 src/ASF/sam0/drivers/sercom/usart/usart.o \
 src/ASF/sam0/drivers/sercom/spi/spi.o \
 src/ASF/sam0/drivers/sercom/sercom.o \
@@ -290,8 +296,12 @@ src/ASF/thirdparty/fatfs/fatfs-r0.09/src/ff.o \
 src/ASF/thirdparty/fatfs/fatfs-r0.09/src/option/ccsbcs.o \
 src/backlight.o \
 src/batteryManagement.o \
+src/BLE_func.o \
 src/clockSetup.o \
+src/dispFunctions.o \
 src/EEPROM.o \
+src/mathBRIC.o \
+src/SDcardBRIC.o \
 src/sensors.o \
 src/timers.o \
 src/ASF/common2/components/memory/sd_mmc/sd_mmc.o \
@@ -318,7 +328,6 @@ src/glcd/graphs.o \
 src/glcd/ST7565R.o \
 src/glcd/text.o \
 src/glcd/text_tiny.o \
-src/glcd/unit_tests.o \
 src/ASF/sam0/drivers/sercom/usart/usart.o \
 src/ASF/sam0/drivers/sercom/spi/spi.o \
 src/ASF/sam0/drivers/sercom/sercom.o \
@@ -351,8 +360,12 @@ src/ASF/thirdparty/fatfs/fatfs-r0.09/src/ff.d \
 src/ASF/thirdparty/fatfs/fatfs-r0.09/src/option/ccsbcs.d \
 src/backlight.d \
 src/batteryManagement.d \
+src/BLE_func.d \
 src/clockSetup.d \
+src/dispFunctions.d \
 src/EEPROM.d \
+src/mathBRIC.d \
+src/SDcardBRIC.d \
 src/sensors.d \
 src/timers.d \
 src/ASF/common2/components/memory/sd_mmc/sd_mmc.d \
@@ -379,7 +392,6 @@ src/glcd/graphs.d \
 src/glcd/ST7565R.d \
 src/glcd/text.d \
 src/glcd/text_tiny.d \
-src/glcd/unit_tests.d \
 src/ASF/sam0/drivers/sercom/usart/usart.d \
 src/ASF/sam0/drivers/sercom/spi/spi.d \
 src/ASF/sam0/drivers/sercom/sercom.d \
@@ -412,8 +424,12 @@ src/ASF/thirdparty/fatfs/fatfs-r0.09/src/ff.d \
 src/ASF/thirdparty/fatfs/fatfs-r0.09/src/option/ccsbcs.d \
 src/backlight.d \
 src/batteryManagement.d \
+src/BLE_func.d \
 src/clockSetup.d \
+src/dispFunctions.d \
 src/EEPROM.d \
+src/mathBRIC.d \
+src/SDcardBRIC.d \
 src/sensors.d \
 src/timers.d \
 src/ASF/common2/components/memory/sd_mmc/sd_mmc.d \
@@ -440,7 +456,6 @@ src/glcd/graphs.d \
 src/glcd/ST7565R.d \
 src/glcd/text.d \
 src/glcd/text_tiny.d \
-src/glcd/unit_tests.d \
 src/ASF/sam0/drivers/sercom/usart/usart.d \
 src/ASF/sam0/drivers/sercom/spi/spi.d \
 src/ASF/sam0/drivers/sercom/sercom.d \
@@ -601,6 +616,13 @@ src/batteryManagement.o: ../src/batteryManagement.c
 	@echo Finished building: $<
 	
 
+src/BLE_func.o: ../src/BLE_func.c
+	@echo Building file: $<
+	@echo Invoking: ARM/GNU C Compiler : 6.3.1
+	$(QUOTE)C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-gcc.exe$(QUOTE)  -x c -mthumb -D__SAML21G18B__ -DDEBUG -DSYSTICK_MODE -DI2C_MASTER_CALLBACK_MODE=true -DUSART_CALLBACK_MODE=true -DEXTINT_CALLBACK_MODE=true -DRTC_COUNT_ASYNC=true -DTC_ASYNC=true -DWDT_CALLBACK_MODE=true -DUSB_DEVICE_LPM_SUPPORT -DUDD_ENABLE -DACCESS_USB_ENABLED -DSPI_CALLBACK_MODE=false -DBOARD=USER_BOARD -DARM_MATH_CM0PLUS=true  -I"../src/ASF/sam0/drivers/system" -I"../src/ASF/sam0/drivers/system/clock/clock_saml21" -I"../src/ASF/sam0/drivers/system/clock" -I"../src/ASF/sam0/drivers/system/interrupt" -I"../src/ASF/sam0/drivers/system/interrupt/system_interrupt_saml21" -I"../src/ASF/sam0/drivers/system/pinmux" -I"../src/ASF/sam0/drivers/system/power/power_sam_l" -I"../src/ASF/sam0/drivers/system/power" -I"../src/ASF/sam0/drivers/system/reset/reset_sam_l" -I"../src/ASF/sam0/drivers/system/reset" -I"../src" -I"../src/config" -I"../src/ASF/sam0/drivers/port" -I"../src/ASF/common/services/ioport" -I"../src/ASF/common2/services/delay" -I"../src/ASF/common2/services/delay/sam0" -I"../src/ASF/sam0/drivers/sercom" -I"../src/ASF/sam0/drivers/sercom/i2c" -I"../src/ASF/sam0/drivers/sercom/i2c/i2c_sam0" -I"../src/ASF/sam0/drivers/sercom/spi" -I"../src/ASF/sam0/drivers/sercom/usart" -I"../src/ASF/sam0/drivers/extint" -I"../src/ASF/sam0/drivers/extint/extint_sam_l_c" -I"../src/ASF/sam0/drivers/rtc" -I"../src/ASF/sam0/drivers/rtc/rtc_sam_l_c" -I"../src/ASF/sam0/drivers/tc" -I"../src/ASF/sam0/drivers/tc/tc_sam_l_c" -I"../src/ASF/common/services/sleepmgr" -I"../src/ASF/common/services/storage/ctrl_access" -I"../src/ASF/common2/components/memory/sd_mmc" -I"../src/ASF/sam0/drivers/wdt" -I"../src/ASF/common/services/usb" -I"../src/ASF/common/services/usb/class/msc" -I"../src/ASF/common/services/usb/class/msc/device" -I"../src/ASF/common/services/usb/udc" -I"../src/ASF/sam0/drivers/usb" -I"../src/ASF/sam0/drivers/usb/usb_sam_l" -I"../src/ASF/sam0/drivers/usb/stack_interface" -I"../src/ASF/common2/boards/user_board" -I"../src/ASF/common/boards" -I"../src/ASF/sam0/utils" -I"../src/ASF/sam0/utils/header_files" -I"../src/ASF/sam0/utils/preprocessor" -I"../src/ASF/thirdparty/CMSIS/Include" -I"../src/ASF/thirdparty/CMSIS/Lib/GCC" -I"../src/ASF/common/utils" -I"../src/ASF/sam0/utils/cmsis/saml21/include_b" -I"../src/ASF/sam0/utils/cmsis/saml21/source" -I"../src/ASF/thirdparty/fatfs/fatfs-r0.09/src" -I"../src/ASF/thirdparty/fatfs/fatfs-port-r0.09/sam0"  -O3 -fdata-sections -ffunction-sections -mlong-calls -g3 -Wall -mcpu=cortex-m0plus -c -pipe -fno-strict-aliasing -Wall -Wstrict-prototypes -Wmissing-prototypes -Werror-implicit-function-declaration -Wpointer-arith -std=gnu99 -ffunction-sections -fdata-sections -Wchar-subscripts -Wcomment -Wformat=2 -Wimplicit-int -Wmain -Wparentheses -Wsequence-point -Wreturn-type -Wswitch -Wtrigraphs -Wunused -Wuninitialized -Wunknown-pragmas -Wfloat-equal -Wundef -Wshadow -Wbad-function-cast -Wwrite-strings -Wsign-compare -Waggregate-return  -Wmissing-declarations -Wformat -Wmissing-format-attribute -Wno-deprecated-declarations -Wpacked -Wredundant-decls -Wnested-externs -Wlong-long -Wunreachable-code -Wcast-align --param max-inline-insns-single=500 -MD -MP -MF "$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)"   -o "$@" "$<" 
+	@echo Finished building: $<
+	
+
 src/clockSetup.o: ../src/clockSetup.c
 	@echo Building file: $<
 	@echo Invoking: ARM/GNU C Compiler : 6.3.1
@@ -608,7 +630,28 @@ src/clockSetup.o: ../src/clockSetup.c
 	@echo Finished building: $<
 	
 
+src/dispFunctions.o: ../src/dispFunctions.c
+	@echo Building file: $<
+	@echo Invoking: ARM/GNU C Compiler : 6.3.1
+	$(QUOTE)C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-gcc.exe$(QUOTE)  -x c -mthumb -D__SAML21G18B__ -DDEBUG -DSYSTICK_MODE -DI2C_MASTER_CALLBACK_MODE=true -DUSART_CALLBACK_MODE=true -DEXTINT_CALLBACK_MODE=true -DRTC_COUNT_ASYNC=true -DTC_ASYNC=true -DWDT_CALLBACK_MODE=true -DUSB_DEVICE_LPM_SUPPORT -DUDD_ENABLE -DACCESS_USB_ENABLED -DSPI_CALLBACK_MODE=false -DBOARD=USER_BOARD -DARM_MATH_CM0PLUS=true  -I"../src/ASF/sam0/drivers/system" -I"../src/ASF/sam0/drivers/system/clock/clock_saml21" -I"../src/ASF/sam0/drivers/system/clock" -I"../src/ASF/sam0/drivers/system/interrupt" -I"../src/ASF/sam0/drivers/system/interrupt/system_interrupt_saml21" -I"../src/ASF/sam0/drivers/system/pinmux" -I"../src/ASF/sam0/drivers/system/power/power_sam_l" -I"../src/ASF/sam0/drivers/system/power" -I"../src/ASF/sam0/drivers/system/reset/reset_sam_l" -I"../src/ASF/sam0/drivers/system/reset" -I"../src" -I"../src/config" -I"../src/ASF/sam0/drivers/port" -I"../src/ASF/common/services/ioport" -I"../src/ASF/common2/services/delay" -I"../src/ASF/common2/services/delay/sam0" -I"../src/ASF/sam0/drivers/sercom" -I"../src/ASF/sam0/drivers/sercom/i2c" -I"../src/ASF/sam0/drivers/sercom/i2c/i2c_sam0" -I"../src/ASF/sam0/drivers/sercom/spi" -I"../src/ASF/sam0/drivers/sercom/usart" -I"../src/ASF/sam0/drivers/extint" -I"../src/ASF/sam0/drivers/extint/extint_sam_l_c" -I"../src/ASF/sam0/drivers/rtc" -I"../src/ASF/sam0/drivers/rtc/rtc_sam_l_c" -I"../src/ASF/sam0/drivers/tc" -I"../src/ASF/sam0/drivers/tc/tc_sam_l_c" -I"../src/ASF/common/services/sleepmgr" -I"../src/ASF/common/services/storage/ctrl_access" -I"../src/ASF/common2/components/memory/sd_mmc" -I"../src/ASF/sam0/drivers/wdt" -I"../src/ASF/common/services/usb" -I"../src/ASF/common/services/usb/class/msc" -I"../src/ASF/common/services/usb/class/msc/device" -I"../src/ASF/common/services/usb/udc" -I"../src/ASF/sam0/drivers/usb" -I"../src/ASF/sam0/drivers/usb/usb_sam_l" -I"../src/ASF/sam0/drivers/usb/stack_interface" -I"../src/ASF/common2/boards/user_board" -I"../src/ASF/common/boards" -I"../src/ASF/sam0/utils" -I"../src/ASF/sam0/utils/header_files" -I"../src/ASF/sam0/utils/preprocessor" -I"../src/ASF/thirdparty/CMSIS/Include" -I"../src/ASF/thirdparty/CMSIS/Lib/GCC" -I"../src/ASF/common/utils" -I"../src/ASF/sam0/utils/cmsis/saml21/include_b" -I"../src/ASF/sam0/utils/cmsis/saml21/source" -I"../src/ASF/thirdparty/fatfs/fatfs-r0.09/src" -I"../src/ASF/thirdparty/fatfs/fatfs-port-r0.09/sam0"  -O3 -fdata-sections -ffunction-sections -mlong-calls -g3 -Wall -mcpu=cortex-m0plus -c -pipe -fno-strict-aliasing -Wall -Wstrict-prototypes -Wmissing-prototypes -Werror-implicit-function-declaration -Wpointer-arith -std=gnu99 -ffunction-sections -fdata-sections -Wchar-subscripts -Wcomment -Wformat=2 -Wimplicit-int -Wmain -Wparentheses -Wsequence-point -Wreturn-type -Wswitch -Wtrigraphs -Wunused -Wuninitialized -Wunknown-pragmas -Wfloat-equal -Wundef -Wshadow -Wbad-function-cast -Wwrite-strings -Wsign-compare -Waggregate-return  -Wmissing-declarations -Wformat -Wmissing-format-attribute -Wno-deprecated-declarations -Wpacked -Wredundant-decls -Wnested-externs -Wlong-long -Wunreachable-code -Wcast-align --param max-inline-insns-single=500 -MD -MP -MF "$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)"   -o "$@" "$<" 
+	@echo Finished building: $<
+	
+
 src/EEPROM.o: ../src/EEPROM.c
+	@echo Building file: $<
+	@echo Invoking: ARM/GNU C Compiler : 6.3.1
+	$(QUOTE)C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-gcc.exe$(QUOTE)  -x c -mthumb -D__SAML21G18B__ -DDEBUG -DSYSTICK_MODE -DI2C_MASTER_CALLBACK_MODE=true -DUSART_CALLBACK_MODE=true -DEXTINT_CALLBACK_MODE=true -DRTC_COUNT_ASYNC=true -DTC_ASYNC=true -DWDT_CALLBACK_MODE=true -DUSB_DEVICE_LPM_SUPPORT -DUDD_ENABLE -DACCESS_USB_ENABLED -DSPI_CALLBACK_MODE=false -DBOARD=USER_BOARD -DARM_MATH_CM0PLUS=true  -I"../src/ASF/sam0/drivers/system" -I"../src/ASF/sam0/drivers/system/clock/clock_saml21" -I"../src/ASF/sam0/drivers/system/clock" -I"../src/ASF/sam0/drivers/system/interrupt" -I"../src/ASF/sam0/drivers/system/interrupt/system_interrupt_saml21" -I"../src/ASF/sam0/drivers/system/pinmux" -I"../src/ASF/sam0/drivers/system/power/power_sam_l" -I"../src/ASF/sam0/drivers/system/power" -I"../src/ASF/sam0/drivers/system/reset/reset_sam_l" -I"../src/ASF/sam0/drivers/system/reset" -I"../src" -I"../src/config" -I"../src/ASF/sam0/drivers/port" -I"../src/ASF/common/services/ioport" -I"../src/ASF/common2/services/delay" -I"../src/ASF/common2/services/delay/sam0" -I"../src/ASF/sam0/drivers/sercom" -I"../src/ASF/sam0/drivers/sercom/i2c" -I"../src/ASF/sam0/drivers/sercom/i2c/i2c_sam0" -I"../src/ASF/sam0/drivers/sercom/spi" -I"../src/ASF/sam0/drivers/sercom/usart" -I"../src/ASF/sam0/drivers/extint" -I"../src/ASF/sam0/drivers/extint/extint_sam_l_c" -I"../src/ASF/sam0/drivers/rtc" -I"../src/ASF/sam0/drivers/rtc/rtc_sam_l_c" -I"../src/ASF/sam0/drivers/tc" -I"../src/ASF/sam0/drivers/tc/tc_sam_l_c" -I"../src/ASF/common/services/sleepmgr" -I"../src/ASF/common/services/storage/ctrl_access" -I"../src/ASF/common2/components/memory/sd_mmc" -I"../src/ASF/sam0/drivers/wdt" -I"../src/ASF/common/services/usb" -I"../src/ASF/common/services/usb/class/msc" -I"../src/ASF/common/services/usb/class/msc/device" -I"../src/ASF/common/services/usb/udc" -I"../src/ASF/sam0/drivers/usb" -I"../src/ASF/sam0/drivers/usb/usb_sam_l" -I"../src/ASF/sam0/drivers/usb/stack_interface" -I"../src/ASF/common2/boards/user_board" -I"../src/ASF/common/boards" -I"../src/ASF/sam0/utils" -I"../src/ASF/sam0/utils/header_files" -I"../src/ASF/sam0/utils/preprocessor" -I"../src/ASF/thirdparty/CMSIS/Include" -I"../src/ASF/thirdparty/CMSIS/Lib/GCC" -I"../src/ASF/common/utils" -I"../src/ASF/sam0/utils/cmsis/saml21/include_b" -I"../src/ASF/sam0/utils/cmsis/saml21/source" -I"../src/ASF/thirdparty/fatfs/fatfs-r0.09/src" -I"../src/ASF/thirdparty/fatfs/fatfs-port-r0.09/sam0"  -O3 -fdata-sections -ffunction-sections -mlong-calls -g3 -Wall -mcpu=cortex-m0plus -c -pipe -fno-strict-aliasing -Wall -Wstrict-prototypes -Wmissing-prototypes -Werror-implicit-function-declaration -Wpointer-arith -std=gnu99 -ffunction-sections -fdata-sections -Wchar-subscripts -Wcomment -Wformat=2 -Wimplicit-int -Wmain -Wparentheses -Wsequence-point -Wreturn-type -Wswitch -Wtrigraphs -Wunused -Wuninitialized -Wunknown-pragmas -Wfloat-equal -Wundef -Wshadow -Wbad-function-cast -Wwrite-strings -Wsign-compare -Waggregate-return  -Wmissing-declarations -Wformat -Wmissing-format-attribute -Wno-deprecated-declarations -Wpacked -Wredundant-decls -Wnested-externs -Wlong-long -Wunreachable-code -Wcast-align --param max-inline-insns-single=500 -MD -MP -MF "$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)"   -o "$@" "$<" 
+	@echo Finished building: $<
+	
+
+src/mathBRIC.o: ../src/mathBRIC.c
+	@echo Building file: $<
+	@echo Invoking: ARM/GNU C Compiler : 6.3.1
+	$(QUOTE)C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-gcc.exe$(QUOTE)  -x c -mthumb -D__SAML21G18B__ -DDEBUG -DSYSTICK_MODE -DI2C_MASTER_CALLBACK_MODE=true -DUSART_CALLBACK_MODE=true -DEXTINT_CALLBACK_MODE=true -DRTC_COUNT_ASYNC=true -DTC_ASYNC=true -DWDT_CALLBACK_MODE=true -DUSB_DEVICE_LPM_SUPPORT -DUDD_ENABLE -DACCESS_USB_ENABLED -DSPI_CALLBACK_MODE=false -DBOARD=USER_BOARD -DARM_MATH_CM0PLUS=true  -I"../src/ASF/sam0/drivers/system" -I"../src/ASF/sam0/drivers/system/clock/clock_saml21" -I"../src/ASF/sam0/drivers/system/clock" -I"../src/ASF/sam0/drivers/system/interrupt" -I"../src/ASF/sam0/drivers/system/interrupt/system_interrupt_saml21" -I"../src/ASF/sam0/drivers/system/pinmux" -I"../src/ASF/sam0/drivers/system/power/power_sam_l" -I"../src/ASF/sam0/drivers/system/power" -I"../src/ASF/sam0/drivers/system/reset/reset_sam_l" -I"../src/ASF/sam0/drivers/system/reset" -I"../src" -I"../src/config" -I"../src/ASF/sam0/drivers/port" -I"../src/ASF/common/services/ioport" -I"../src/ASF/common2/services/delay" -I"../src/ASF/common2/services/delay/sam0" -I"../src/ASF/sam0/drivers/sercom" -I"../src/ASF/sam0/drivers/sercom/i2c" -I"../src/ASF/sam0/drivers/sercom/i2c/i2c_sam0" -I"../src/ASF/sam0/drivers/sercom/spi" -I"../src/ASF/sam0/drivers/sercom/usart" -I"../src/ASF/sam0/drivers/extint" -I"../src/ASF/sam0/drivers/extint/extint_sam_l_c" -I"../src/ASF/sam0/drivers/rtc" -I"../src/ASF/sam0/drivers/rtc/rtc_sam_l_c" -I"../src/ASF/sam0/drivers/tc" -I"../src/ASF/sam0/drivers/tc/tc_sam_l_c" -I"../src/ASF/common/services/sleepmgr" -I"../src/ASF/common/services/storage/ctrl_access" -I"../src/ASF/common2/components/memory/sd_mmc" -I"../src/ASF/sam0/drivers/wdt" -I"../src/ASF/common/services/usb" -I"../src/ASF/common/services/usb/class/msc" -I"../src/ASF/common/services/usb/class/msc/device" -I"../src/ASF/common/services/usb/udc" -I"../src/ASF/sam0/drivers/usb" -I"../src/ASF/sam0/drivers/usb/usb_sam_l" -I"../src/ASF/sam0/drivers/usb/stack_interface" -I"../src/ASF/common2/boards/user_board" -I"../src/ASF/common/boards" -I"../src/ASF/sam0/utils" -I"../src/ASF/sam0/utils/header_files" -I"../src/ASF/sam0/utils/preprocessor" -I"../src/ASF/thirdparty/CMSIS/Include" -I"../src/ASF/thirdparty/CMSIS/Lib/GCC" -I"../src/ASF/common/utils" -I"../src/ASF/sam0/utils/cmsis/saml21/include_b" -I"../src/ASF/sam0/utils/cmsis/saml21/source" -I"../src/ASF/thirdparty/fatfs/fatfs-r0.09/src" -I"../src/ASF/thirdparty/fatfs/fatfs-port-r0.09/sam0"  -O3 -fdata-sections -ffunction-sections -mlong-calls -g3 -Wall -mcpu=cortex-m0plus -c -pipe -fno-strict-aliasing -Wall -Wstrict-prototypes -Wmissing-prototypes -Werror-implicit-function-declaration -Wpointer-arith -std=gnu99 -ffunction-sections -fdata-sections -Wchar-subscripts -Wcomment -Wformat=2 -Wimplicit-int -Wmain -Wparentheses -Wsequence-point -Wreturn-type -Wswitch -Wtrigraphs -Wunused -Wuninitialized -Wunknown-pragmas -Wfloat-equal -Wundef -Wshadow -Wbad-function-cast -Wwrite-strings -Wsign-compare -Waggregate-return  -Wmissing-declarations -Wformat -Wmissing-format-attribute -Wno-deprecated-declarations -Wpacked -Wredundant-decls -Wnested-externs -Wlong-long -Wunreachable-code -Wcast-align --param max-inline-insns-single=500 -MD -MP -MF "$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)"   -o "$@" "$<" 
+	@echo Finished building: $<
+	
+
+src/SDcardBRIC.o: ../src/SDcardBRIC.c
 	@echo Building file: $<
 	@echo Invoking: ARM/GNU C Compiler : 6.3.1
 	$(QUOTE)C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-gcc.exe$(QUOTE)  -x c -mthumb -D__SAML21G18B__ -DDEBUG -DSYSTICK_MODE -DI2C_MASTER_CALLBACK_MODE=true -DUSART_CALLBACK_MODE=true -DEXTINT_CALLBACK_MODE=true -DRTC_COUNT_ASYNC=true -DTC_ASYNC=true -DWDT_CALLBACK_MODE=true -DUSB_DEVICE_LPM_SUPPORT -DUDD_ENABLE -DACCESS_USB_ENABLED -DSPI_CALLBACK_MODE=false -DBOARD=USER_BOARD -DARM_MATH_CM0PLUS=true  -I"../src/ASF/sam0/drivers/system" -I"../src/ASF/sam0/drivers/system/clock/clock_saml21" -I"../src/ASF/sam0/drivers/system/clock" -I"../src/ASF/sam0/drivers/system/interrupt" -I"../src/ASF/sam0/drivers/system/interrupt/system_interrupt_saml21" -I"../src/ASF/sam0/drivers/system/pinmux" -I"../src/ASF/sam0/drivers/system/power/power_sam_l" -I"../src/ASF/sam0/drivers/system/power" -I"../src/ASF/sam0/drivers/system/reset/reset_sam_l" -I"../src/ASF/sam0/drivers/system/reset" -I"../src" -I"../src/config" -I"../src/ASF/sam0/drivers/port" -I"../src/ASF/common/services/ioport" -I"../src/ASF/common2/services/delay" -I"../src/ASF/common2/services/delay/sam0" -I"../src/ASF/sam0/drivers/sercom" -I"../src/ASF/sam0/drivers/sercom/i2c" -I"../src/ASF/sam0/drivers/sercom/i2c/i2c_sam0" -I"../src/ASF/sam0/drivers/sercom/spi" -I"../src/ASF/sam0/drivers/sercom/usart" -I"../src/ASF/sam0/drivers/extint" -I"../src/ASF/sam0/drivers/extint/extint_sam_l_c" -I"../src/ASF/sam0/drivers/rtc" -I"../src/ASF/sam0/drivers/rtc/rtc_sam_l_c" -I"../src/ASF/sam0/drivers/tc" -I"../src/ASF/sam0/drivers/tc/tc_sam_l_c" -I"../src/ASF/common/services/sleepmgr" -I"../src/ASF/common/services/storage/ctrl_access" -I"../src/ASF/common2/components/memory/sd_mmc" -I"../src/ASF/sam0/drivers/wdt" -I"../src/ASF/common/services/usb" -I"../src/ASF/common/services/usb/class/msc" -I"../src/ASF/common/services/usb/class/msc/device" -I"../src/ASF/common/services/usb/udc" -I"../src/ASF/sam0/drivers/usb" -I"../src/ASF/sam0/drivers/usb/usb_sam_l" -I"../src/ASF/sam0/drivers/usb/stack_interface" -I"../src/ASF/common2/boards/user_board" -I"../src/ASF/common/boards" -I"../src/ASF/sam0/utils" -I"../src/ASF/sam0/utils/header_files" -I"../src/ASF/sam0/utils/preprocessor" -I"../src/ASF/thirdparty/CMSIS/Include" -I"../src/ASF/thirdparty/CMSIS/Lib/GCC" -I"../src/ASF/common/utils" -I"../src/ASF/sam0/utils/cmsis/saml21/include_b" -I"../src/ASF/sam0/utils/cmsis/saml21/source" -I"../src/ASF/thirdparty/fatfs/fatfs-r0.09/src" -I"../src/ASF/thirdparty/fatfs/fatfs-port-r0.09/sam0"  -O3 -fdata-sections -ffunction-sections -mlong-calls -g3 -Wall -mcpu=cortex-m0plus -c -pipe -fno-strict-aliasing -Wall -Wstrict-prototypes -Wmissing-prototypes -Werror-implicit-function-declaration -Wpointer-arith -std=gnu99 -ffunction-sections -fdata-sections -Wchar-subscripts -Wcomment -Wformat=2 -Wimplicit-int -Wmain -Wparentheses -Wsequence-point -Wreturn-type -Wswitch -Wtrigraphs -Wunused -Wuninitialized -Wunknown-pragmas -Wfloat-equal -Wundef -Wshadow -Wbad-function-cast -Wwrite-strings -Wsign-compare -Waggregate-return  -Wmissing-declarations -Wformat -Wmissing-format-attribute -Wno-deprecated-declarations -Wpacked -Wredundant-decls -Wnested-externs -Wlong-long -Wunreachable-code -Wcast-align --param max-inline-insns-single=500 -MD -MP -MF "$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)"   -o "$@" "$<" 
@@ -791,13 +834,6 @@ src/glcd/text.o: ../src/glcd/text.c
 	
 
 src/glcd/text_tiny.o: ../src/glcd/text_tiny.c
-	@echo Building file: $<
-	@echo Invoking: ARM/GNU C Compiler : 6.3.1
-	$(QUOTE)C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-gcc.exe$(QUOTE)  -x c -mthumb -D__SAML21G18B__ -DDEBUG -DSYSTICK_MODE -DI2C_MASTER_CALLBACK_MODE=true -DUSART_CALLBACK_MODE=true -DEXTINT_CALLBACK_MODE=true -DRTC_COUNT_ASYNC=true -DTC_ASYNC=true -DWDT_CALLBACK_MODE=true -DUSB_DEVICE_LPM_SUPPORT -DUDD_ENABLE -DACCESS_USB_ENABLED -DSPI_CALLBACK_MODE=false -DBOARD=USER_BOARD -DARM_MATH_CM0PLUS=true  -I"../src/ASF/sam0/drivers/system" -I"../src/ASF/sam0/drivers/system/clock/clock_saml21" -I"../src/ASF/sam0/drivers/system/clock" -I"../src/ASF/sam0/drivers/system/interrupt" -I"../src/ASF/sam0/drivers/system/interrupt/system_interrupt_saml21" -I"../src/ASF/sam0/drivers/system/pinmux" -I"../src/ASF/sam0/drivers/system/power/power_sam_l" -I"../src/ASF/sam0/drivers/system/power" -I"../src/ASF/sam0/drivers/system/reset/reset_sam_l" -I"../src/ASF/sam0/drivers/system/reset" -I"../src" -I"../src/config" -I"../src/ASF/sam0/drivers/port" -I"../src/ASF/common/services/ioport" -I"../src/ASF/common2/services/delay" -I"../src/ASF/common2/services/delay/sam0" -I"../src/ASF/sam0/drivers/sercom" -I"../src/ASF/sam0/drivers/sercom/i2c" -I"../src/ASF/sam0/drivers/sercom/i2c/i2c_sam0" -I"../src/ASF/sam0/drivers/sercom/spi" -I"../src/ASF/sam0/drivers/sercom/usart" -I"../src/ASF/sam0/drivers/extint" -I"../src/ASF/sam0/drivers/extint/extint_sam_l_c" -I"../src/ASF/sam0/drivers/rtc" -I"../src/ASF/sam0/drivers/rtc/rtc_sam_l_c" -I"../src/ASF/sam0/drivers/tc" -I"../src/ASF/sam0/drivers/tc/tc_sam_l_c" -I"../src/ASF/common/services/sleepmgr" -I"../src/ASF/common/services/storage/ctrl_access" -I"../src/ASF/common2/components/memory/sd_mmc" -I"../src/ASF/sam0/drivers/wdt" -I"../src/ASF/common/services/usb" -I"../src/ASF/common/services/usb/class/msc" -I"../src/ASF/common/services/usb/class/msc/device" -I"../src/ASF/common/services/usb/udc" -I"../src/ASF/sam0/drivers/usb" -I"../src/ASF/sam0/drivers/usb/usb_sam_l" -I"../src/ASF/sam0/drivers/usb/stack_interface" -I"../src/ASF/common2/boards/user_board" -I"../src/ASF/common/boards" -I"../src/ASF/sam0/utils" -I"../src/ASF/sam0/utils/header_files" -I"../src/ASF/sam0/utils/preprocessor" -I"../src/ASF/thirdparty/CMSIS/Include" -I"../src/ASF/thirdparty/CMSIS/Lib/GCC" -I"../src/ASF/common/utils" -I"../src/ASF/sam0/utils/cmsis/saml21/include_b" -I"../src/ASF/sam0/utils/cmsis/saml21/source" -I"../src/ASF/thirdparty/fatfs/fatfs-r0.09/src" -I"../src/ASF/thirdparty/fatfs/fatfs-port-r0.09/sam0"  -O3 -fdata-sections -ffunction-sections -mlong-calls -g3 -Wall -mcpu=cortex-m0plus -c -pipe -fno-strict-aliasing -Wall -Wstrict-prototypes -Wmissing-prototypes -Werror-implicit-function-declaration -Wpointer-arith -std=gnu99 -ffunction-sections -fdata-sections -Wchar-subscripts -Wcomment -Wformat=2 -Wimplicit-int -Wmain -Wparentheses -Wsequence-point -Wreturn-type -Wswitch -Wtrigraphs -Wunused -Wuninitialized -Wunknown-pragmas -Wfloat-equal -Wundef -Wshadow -Wbad-function-cast -Wwrite-strings -Wsign-compare -Waggregate-return  -Wmissing-declarations -Wformat -Wmissing-format-attribute -Wno-deprecated-declarations -Wpacked -Wredundant-decls -Wnested-externs -Wlong-long -Wunreachable-code -Wcast-align --param max-inline-insns-single=500 -MD -MP -MF "$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)"   -o "$@" "$<" 
-	@echo Finished building: $<
-	
-
-src/glcd/unit_tests.o: ../src/glcd/unit_tests.c
 	@echo Building file: $<
 	@echo Invoking: ARM/GNU C Compiler : 6.3.1
 	$(QUOTE)C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-gcc.exe$(QUOTE)  -x c -mthumb -D__SAML21G18B__ -DDEBUG -DSYSTICK_MODE -DI2C_MASTER_CALLBACK_MODE=true -DUSART_CALLBACK_MODE=true -DEXTINT_CALLBACK_MODE=true -DRTC_COUNT_ASYNC=true -DTC_ASYNC=true -DWDT_CALLBACK_MODE=true -DUSB_DEVICE_LPM_SUPPORT -DUDD_ENABLE -DACCESS_USB_ENABLED -DSPI_CALLBACK_MODE=false -DBOARD=USER_BOARD -DARM_MATH_CM0PLUS=true  -I"../src/ASF/sam0/drivers/system" -I"../src/ASF/sam0/drivers/system/clock/clock_saml21" -I"../src/ASF/sam0/drivers/system/clock" -I"../src/ASF/sam0/drivers/system/interrupt" -I"../src/ASF/sam0/drivers/system/interrupt/system_interrupt_saml21" -I"../src/ASF/sam0/drivers/system/pinmux" -I"../src/ASF/sam0/drivers/system/power/power_sam_l" -I"../src/ASF/sam0/drivers/system/power" -I"../src/ASF/sam0/drivers/system/reset/reset_sam_l" -I"../src/ASF/sam0/drivers/system/reset" -I"../src" -I"../src/config" -I"../src/ASF/sam0/drivers/port" -I"../src/ASF/common/services/ioport" -I"../src/ASF/common2/services/delay" -I"../src/ASF/common2/services/delay/sam0" -I"../src/ASF/sam0/drivers/sercom" -I"../src/ASF/sam0/drivers/sercom/i2c" -I"../src/ASF/sam0/drivers/sercom/i2c/i2c_sam0" -I"../src/ASF/sam0/drivers/sercom/spi" -I"../src/ASF/sam0/drivers/sercom/usart" -I"../src/ASF/sam0/drivers/extint" -I"../src/ASF/sam0/drivers/extint/extint_sam_l_c" -I"../src/ASF/sam0/drivers/rtc" -I"../src/ASF/sam0/drivers/rtc/rtc_sam_l_c" -I"../src/ASF/sam0/drivers/tc" -I"../src/ASF/sam0/drivers/tc/tc_sam_l_c" -I"../src/ASF/common/services/sleepmgr" -I"../src/ASF/common/services/storage/ctrl_access" -I"../src/ASF/common2/components/memory/sd_mmc" -I"../src/ASF/sam0/drivers/wdt" -I"../src/ASF/common/services/usb" -I"../src/ASF/common/services/usb/class/msc" -I"../src/ASF/common/services/usb/class/msc/device" -I"../src/ASF/common/services/usb/udc" -I"../src/ASF/sam0/drivers/usb" -I"../src/ASF/sam0/drivers/usb/usb_sam_l" -I"../src/ASF/sam0/drivers/usb/stack_interface" -I"../src/ASF/common2/boards/user_board" -I"../src/ASF/common/boards" -I"../src/ASF/sam0/utils" -I"../src/ASF/sam0/utils/header_files" -I"../src/ASF/sam0/utils/preprocessor" -I"../src/ASF/thirdparty/CMSIS/Include" -I"../src/ASF/thirdparty/CMSIS/Lib/GCC" -I"../src/ASF/common/utils" -I"../src/ASF/sam0/utils/cmsis/saml21/include_b" -I"../src/ASF/sam0/utils/cmsis/saml21/source" -I"../src/ASF/thirdparty/fatfs/fatfs-r0.09/src" -I"../src/ASF/thirdparty/fatfs/fatfs-port-r0.09/sam0"  -O3 -fdata-sections -ffunction-sections -mlong-calls -g3 -Wall -mcpu=cortex-m0plus -c -pipe -fno-strict-aliasing -Wall -Wstrict-prototypes -Wmissing-prototypes -Werror-implicit-function-declaration -Wpointer-arith -std=gnu99 -ffunction-sections -fdata-sections -Wchar-subscripts -Wcomment -Wformat=2 -Wimplicit-int -Wmain -Wparentheses -Wsequence-point -Wreturn-type -Wswitch -Wtrigraphs -Wunused -Wuninitialized -Wunknown-pragmas -Wfloat-equal -Wundef -Wshadow -Wbad-function-cast -Wwrite-strings -Wsign-compare -Waggregate-return  -Wmissing-declarations -Wformat -Wmissing-format-attribute -Wno-deprecated-declarations -Wpacked -Wredundant-decls -Wnested-externs -Wlong-long -Wunreachable-code -Wcast-align --param max-inline-insns-single=500 -MD -MP -MF "$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)"   -o "$@" "$<" 

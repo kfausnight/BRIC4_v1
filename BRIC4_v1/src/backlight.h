@@ -10,28 +10,26 @@
 #define BACKLIGHT_H_
 
 
-#include <main.h>
-#include <asf.h>
-#include <comms/comms.h>
 
-struct BACKLIGHTCOLOR
-{
-	char *colorStringPtr;
-	uint8_t red;
-	uint8_t blue;
-	uint8_t green;	
-};
+#include <asf.h>
+#include <main.h>
+
+#define COLOR_MAX	30  //  maximum color index
+#define BRIGHT_MAX	5   //  maximum brightness index
 
 
 
 void backlightOff(void);
-void backlightOn(void);
+void backlightOn(struct BACKLIGHT_SETTING *);
 void backlight_level(struct BACKLIGHT_SETTING *);
-char* backlightGetCurrentColor(void);
-void backlightColorToggle(void);
-void backlightMinus(void);
-void backlightPlus(void);
-void backlightLevelToggle(void);
-struct BACKLIGHTCOLOR* backlightCustomAdjust(char , int8_t );
+char* backlightGetCurrentColor(struct BACKLIGHT_SETTING *);
+void backlightColorToggle(struct BACKLIGHT_SETTING *);
+void backlightMinus(struct BACKLIGHT_SETTING *);
+void backlightPlus(struct BACKLIGHT_SETTING *);
+void backlightLevelToggle(struct BACKLIGHT_SETTING *);
+struct BACKLIGHT_COLOR * backlightCustomAdjust(char , int8_t );
+
+
+#include <main.h>
 
 #endif /* BACKLIGHT_H_ */

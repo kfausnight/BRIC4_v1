@@ -8,12 +8,13 @@
 
 #include <comms\comms.h>
 
-extern bool USART_BLE_enabled;
-volatile bool LaserTransmitComplete;
-volatile bool LaserReceiveComplete;
+volatile bool LaserTransmitComplete = false;
+volatile bool LaserReceiveComplete = false;
+volatile bool BleTransmitComplete = false;
+volatile bool BleReceiveComplete = false;
 volatile enum LASER_MESSAGE_TYPE laserCurrentMessage;
+volatile char bleRcvByte;
 
-volatile bool spiReceiveComplete;
 
 
 //Disable
@@ -22,19 +23,39 @@ void disable_comms(void){
 	spi_disable(&spi_main);
 	usart_disable(&usart_laser);
 	usart_disable(&usart_BLE);
-	USART_BLE_enabled = false;
 }
 
-
+void enable_comms(void){
+	setup_spi();
+	configure_i2c_master();
+	configure_usart_Laser();
+	configure_usart_BLE();
+}
 
 //SPI
 //***************************************
-//bool isSpiTransrevComplete(void){
-//	return spiReceiveComplete;	
-//}
-//void resetSpiTransrevComplete(void){
-//	spiReceiveComplete = false;
-//}
+void spi_setBaud(uint32_t baudRate){
+	uint16_t baud = 0;
+	
+	//  Disable module to make change
+	spi_disable(&spi_main);
+	
+	
+	/* Find frequency of the internal SERCOMi_GCLK_ID_CORE */
+	uint32_t sercom_index = _sercom_get_sercom_inst_index(spi_main.hw);
+	uint32_t gclk_index   = sercom_index + SERCOM0_GCLK_ID_CORE;
+	uint32_t internal_clock = system_gclk_chan_get_hz(gclk_index);
+
+	/* Get baud value, based on baudrate and the internal clock frequency */
+	enum status_code error_code = _sercom_get_sync_baud_val(
+		baudRate,
+		internal_clock, &baud);
+	spi_main.hw->SPI.BAUD.reg = (uint8_t)baud;
+	
+	// Re-Enable
+	spi_enable(&spi_main);
+}
+
 
 void setup_spi(void){
 	//  Maximum Speed LCD:  2.5 MHz
@@ -69,7 +90,7 @@ void setup_spi(void){
 	config_spi_master.pinmux_pad2 = PINMUX_PB10D_SERCOM4_PAD2;
 	config_spi_master.pinmux_pad3 = PINMUX_PB11D_SERCOM4_PAD3;
 	config_spi_master.character_size = SPI_CHARACTER_SIZE_8BIT ;
-	config_spi_master.mode_specific.master.baudrate = baudMaxAcc;
+	config_spi_master.mode_specific.master.baudrate = baudRateMin;
 	spi_init(&spi_main, SERCOM4, &config_spi_master);
 	spi_enable(&spi_main);
 
@@ -79,45 +100,10 @@ void setup_spi(void){
 
 
 
-
-
-/*
-void config_spi(enum spi_device SPI_DEVICE){
-	static uint8_t *ptr_POL = 0x42001003;
-	//uint8_t *ptr_CTRLA,
-
-	//ptr_CTRLA=0x42001000;//  CTRLA byte 1 register
-	//ptr_POL  =0x42001003;//  SPI polarity register
-	spi_disable(&spi_main);
-	switch (SPI_DEVICE)
-	{
-		case LCD:
-			*ptr_POL = 0b00000000;//debug
-			
-			break;
-		case sensors:
-			*ptr_POL = 0b00000000;
-			break;
-		case SD_card:
-			*ptr_POL = 0b00000000;
-			break;
-		default:
-			*ptr_POL = 0b00000000;
-	}
-
-	spi_enable(&spi_main);
-
-}
-*/
-
-
-
-
-
 //USART
 //******************************************
 
-void configure_usart(void){
+void configure_usart_Laser(void){
 	struct usart_config config_usart;
 	enum status_code usart_status;
 	
@@ -135,6 +121,23 @@ void configure_usart(void){
 	}while((usart_status != STATUS_OK) && (usart_status != STATUS_ERR_DENIED) );
 	usart_enable(&usart_laser);
 	
+	
+	//  Setup Callbacks
+	usart_register_callback(&usart_laser,writeLaserCallback, USART_CALLBACK_BUFFER_TRANSMITTED);
+	usart_register_callback(&usart_laser,readLaserCallback, USART_CALLBACK_BUFFER_RECEIVED);
+	usart_enable_callback(&usart_laser, USART_CALLBACK_BUFFER_TRANSMITTED);
+	usart_enable_callback(&usart_laser, USART_CALLBACK_BUFFER_RECEIVED);
+	
+	//  Laser, Initiate background read to buffer
+	rxBufferLaserIndex = 0;
+	usart_read_job(&usart_laser, rxBufferLaser); // 
+}
+
+void configure_usart_BLE(void){
+	struct usart_config config_usart;
+	enum status_code usart_status;
+	
+	
 	// BLE UART setup SERCOM0
 	usart_get_config_defaults(&config_usart);
 	config_usart.generator_source = GCLK_FOR_USART_BLE;
@@ -145,45 +148,45 @@ void configure_usart(void){
 	config_usart.pinmux_pad2 = PINMUX_PA10C_SERCOM0_PAD2;
 	config_usart.pinmux_pad3 = PINMUX_PA11C_SERCOM0_PAD3;
 	do {
-		usart_status = usart_init(&usart_laser,	SERCOM1, &config_usart) ;
+		usart_status = usart_init(&usart_BLE,	SERCOM0, &config_usart) ;
 	}while((usart_status != STATUS_OK) && (usart_status != STATUS_ERR_DENIED) );
 	usart_enable(&usart_BLE);
-	USART_BLE_enabled = true;
 	
 	//  Setup Callbacks
-	configure_usart_callbacks();
+	usart_register_callback(&usart_BLE,writeBleCallback, USART_CALLBACK_BUFFER_TRANSMITTED);
+	usart_register_callback(&usart_BLE,readBleCallback, USART_CALLBACK_BUFFER_RECEIVED);
+	usart_enable_callback(&usart_BLE, USART_CALLBACK_BUFFER_TRANSMITTED);
+	usart_enable_callback(&usart_BLE, USART_CALLBACK_BUFFER_RECEIVED);
 	
 	//  Initiate background read to buffer
-	rxBufferLaserIndex = 0;
-	debugBufferIndex = 0;
-	usart_read_job(&usart_laser, rxBufferLaser); // 
+	rxBufferBleClear();
+	usart_read_job(&usart_BLE, &bleRcvByte);
 }
 
-void configure_usart_callbacks(void)
-{
-	usart_register_callback(&usart_laser,
-	writeLaserCallback, USART_CALLBACK_BUFFER_TRANSMITTED);
-	usart_register_callback(&usart_laser,
-	readLaserCallback, USART_CALLBACK_BUFFER_RECEIVED);
-	usart_enable_callback(&usart_laser, USART_CALLBACK_BUFFER_TRANSMITTED);
-	usart_enable_callback(&usart_laser, USART_CALLBACK_BUFFER_RECEIVED);
+void BLE_usart_isolate(void){
+	//  Isolate MCU from BLE over USART
+	//  Allows an external interface to communicate with BLE
+	usart_disable(&usart_BLE);
+	ioport_set_pin_dir(MCU_RTS1, IOPORT_DIR_OUTPUT);
+	ioport_set_pin_level(MCU_RTS1, false);
+	ioport_set_pin_dir(MCU_CTS1, IOPORT_DIR_INPUT);
+	ioport_reset_pin_mode(MCU_TX1);
+	ioport_reset_pin_mode(MCU_RX1);
+	ioport_set_pin_dir(MCU_TX1, IOPORT_DIR_INPUT);
+	ioport_set_pin_dir(MCU_RX1, IOPORT_DIR_INPUT);
+	
 }
-
 
 
 
 void readLaserCallback(struct usart_module *const usart_module)
 {
-	//***************debug*******************
-	debugBuffer[debugBufferIndex] = rxBufferLaser[rxBufferLaserIndex];
-	debugBufferIndex++;
-	if(debugBufferIndex>=sizeof(debugBuffer)){debugBufferIndex=0;}
-	//**************debug********************
+
 	if(rxBufferLaser[rxBufferLaserIndex]==0xA8){
 		//  End of message key received (per laser comm protocol)
 		LaserReceiveComplete=true;		
 		rxBufferLaserIndex = 0;
-		laserCurrentMessage = laserMessageType();;
+		laserCurrentMessage = laserMessageType();
 		
 	}else if(rxBufferLaser[rxBufferLaserIndex]==0xAA){
 		//  Start of message key received
@@ -210,6 +213,50 @@ void writeLaserCallback(struct usart_module *const usart_module)
 }
 
 
+void readBleCallback(struct usart_module *const usart_module)
+{	
+	//DEBUG///////////////////////////////////////////////////
+	debugBuffPtr = &debugBuff[0];
+	debugBuff[debugBuffIndex] = bleRcvByte;
+	debugBuffIndex++;
+	
+	if (debugBuffIndex>=sizeof(debugBuff)){debugBuffIndex = 0;}
+	//DEBUG///////////////////////////////////////////////////
+	
+	if((bleRcvByte==NL)||(bleRcvByte==CR)||(bleRcvByte==00)){ 
+		// "\n" or "CR" or null character received
+		//  End of message key received (per BLE comm protocol)
+		//  Ignore line return if it's the first character
+		if(rxBufferBleIndex!=0){
+			//  Replace line return with string Null
+			BleReceiveComplete=true;		
+			rxBufferBle[rxBufferBleIndex]=0x00;  //  Put in null character at end	
+		}
+		
+	}else{
+		// Regular character received
+		if (BleReceiveComplete){
+			rxBufferLaserClear();	
+		}
+		rxBufferBle[rxBufferBleIndex] = bleRcvByte;
+		rxBufferBleIndex++;		
+		
+		//  Catch to prevent buffer overflow
+		if (rxBufferBleIndex>=sizeof(rxBufferBle)){
+			rxBufferBleIndex = 0;
+		}
+		
+	}
+	//  Prepare to take another byte
+	usart_read_job(&usart_BLE, &bleRcvByte);
+
+}
+
+void writeBleCallback(struct usart_module *const usart_module)
+{
+	BleTransmitComplete = true;
+}
+
 enum status_code writeLaser(uint8_t *tx_data, uint16_t length){
 	enum status_code writeStatus;
 	//clear_rx_buffer();
@@ -217,7 +264,13 @@ enum status_code writeLaser(uint8_t *tx_data, uint16_t length){
 	writeStatus = usart_write_buffer_job(&usart_laser, tx_data, length);
 	return writeStatus;
 }
-	
+
+enum status_code writeBle(uint8_t *tx_data, uint16_t length){
+	enum status_code writeStatus;
+	BleTransmitComplete=false;
+	writeStatus = usart_write_buffer_job(&usart_BLE, tx_data, length);
+	return writeStatus;
+}	
 	
 
 bool isLaserTransmitComplete(void){
@@ -225,6 +278,13 @@ bool isLaserTransmitComplete(void){
 }
 bool isLaserReceiveComplete(void){
 	return LaserReceiveComplete;
+}
+
+bool isBleTransmitComplete(void){
+	return BleTransmitComplete;
+}
+bool isBleReceiveComplete(void){
+	return BleReceiveComplete;
 }
 
 void rxBufferLaserClear(void){
@@ -235,6 +295,16 @@ void rxBufferLaserClear(void){
 	laserCurrentMessage = NONE;
 	LaserReceiveComplete=false;
 	rxBufferLaserIndex = 0;
+}
+
+void rxBufferBleClear(void){
+	uint32_t i;
+	for (i=0;i<UART_BUFFER_LENGTH;i++){
+		rxBufferBle[i] = 0;
+	}
+	
+	rxBufferBleIndex = 0;
+	BleReceiveComplete = false;
 }
 
 //  Determine the type of message currently in the buffer
@@ -249,8 +319,12 @@ enum LASER_MESSAGE_TYPE laserMessageType(void){
 		
 	}
 	return messType;
-};
+}
 
+
+bool isBleCommEnabled(void){
+	return (usart_BLE.hw->USART.CTRLA.reg & SERCOM_USART_CTRLA_ENABLE);
+}
 
 
 //I2C

@@ -41,7 +41,7 @@
 /** Fonts */
 #include "fonts/font5x7.h"
 //#include "fonts/Liberation_Sans11x14_Numbers.h"
-#include "fonts/Liberation_Sans15x21_Numbers.h"
+//#include "fonts/Liberation_Sans15x21_Numbers.h"
 //#include "fonts/Liberation_Sans17x17_Alpha.h"
 //#include "fonts/Liberation_Sans27x36_Numbers.h"
 //#include "fonts/Bebas_Neue20x36_Bold_Numbers.h"

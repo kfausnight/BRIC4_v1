@@ -40,9 +40,17 @@ src\backlight.c
 
 src\batteryManagement.c
 
+src\BLE_func.c
+
 src\clockSetup.c
 
+src\dispFunctions.c
+
 src\EEPROM.c
+
+src\mathBRIC.c
+
+src\SDcardBRIC.c
 
 src\sensors.c
 
@@ -95,8 +103,6 @@ src\glcd\ST7565R.c
 src\glcd\text.c
 
 src\glcd\text_tiny.c
-
-src\glcd\unit_tests.c
 
 src\ASF\sam0\drivers\sercom\usart\usart.c
 

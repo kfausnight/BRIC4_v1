@@ -5,7 +5,6 @@
  *  Author: Kris Fausnight
  */ 
 #include <sensors.h>
-#include <backlight.h>
 
 
 // Accelerometer Constants
@@ -20,9 +19,13 @@ uint8_t	sw_reset[]=		{0xB4,0x00,0x20,0x98};
 uint8_t read_whoami[]=	{0x40,0x00,0x00,0x91};
 
 // Compass Constants
-#define c_coarse_gain 7000
-uint8_t cycle_count1=0x01; //cycle count for setup;
-uint8_t cycle_count2=0x90; //0x0190 = 400d
+//#define c_coarse_gain 7000
+//uint8_t cycle_count1=0x01; //cycle count for setup;
+#define c_coarse_gain 10000
+//uint8_t cycle_count1=0x01; //cycle count for setup;
+//uint8_t cycle_count2=0x00; //0x0190 = 400d
+uint8_t cycle_count1=0x02; //cycle count for setup;
+uint8_t cycle_count2=0x00; //0x0190 = 400d
 
 //  Laser commands
 #define laser_reset IOPORT_CREATE_PIN(IOPORT_PORTA, 2)
@@ -32,27 +35,13 @@ uint8_t cmd_laser_single[5]=	{0xAA, 0x00, 0x44, 0x44, 0xA8};
 uint8_t cmd_beep_on[6]=			{0xAA, 0x00, 0x47, 0x01, 0x48, 0xA8};
 uint8_t cmd_beep_off[6]=		{0xAA, 0x00, 0x47, 0x00, 0x48, 0xA8};
 
+//  Status
+volatile bool laserStatus = false; //  Variable to track when laser is turned on
 
 
-
-// Miscellaneous
-extern float rad2deg, deg2rad, mt2ft;//  Conversion factor meters to feet, degrees to radians
-extern struct INST_CAL a1_calst, a2_calst, c1_calst, c2_calst, dist_calst;
-extern volatile bool laser_triggered;
-#define timeOutMs 5000 //  When taking a measurement, wait this long for laser data to arrive back
-extern struct OPTIONS options;
-
-
-//  Error Checking
-extern struct CAL_REPORT cal_report_azm_inc;
-#define errorSensitivityAdjustmentIncrement 0.25
-#define errorSensitivityAdjustmentMin		 0.5
-#define errorSensitivityAdjustmentMax		3
-
-
-
-
-
+bool isLaserOn(void){
+	return laserStatus;
+}
 
 float calc_magnitude(float xyz[3]){
 	float magnitude;
@@ -61,21 +50,19 @@ float calc_magnitude(float xyz[3]){
 }
 
 void quick_measurement(struct MEASUREMENT *meas_inst){
+	
+	read_accel(&slave_acc1, meas_inst->a1Raw);
+	read_accel(&slave_acc2, meas_inst->a2Raw);
+	read_mag_double(meas_inst->m1Raw, meas_inst->m2Raw);
 
 	
-	//config_spi(sensors);
-	
-	read_accel(&slave_acc1, meas_inst->a1xyz);
-	read_accel(&slave_acc2, meas_inst->a2xyz);
-	read_mag(&slave_mag1, meas_inst->c1xyz);
-	read_mag(&slave_mag2, meas_inst->c2xyz);
-	//config_spi(LCD);
-	
 	//  Calibrate Results
-	cal_apply_cal(meas_inst->a1xyz, meas_inst->a1xyz, &a1_calst);
-	cal_apply_cal(meas_inst->a2xyz, meas_inst->a2xyz, &a2_calst);
-	cal_apply_cal(meas_inst->c1xyz, meas_inst->c1xyz, &c1_calst);
-	cal_apply_cal(meas_inst->c2xyz, meas_inst->c2xyz, &c2_calst);
+	cal_apply_cal(meas_inst->a1Raw, meas_inst->a1Cal, &a1_calst);
+	cal_apply_cal(meas_inst->a2Raw, meas_inst->a2Cal, &a2_calst);
+	cal_apply_cal(meas_inst->m1Raw, meas_inst->m1Cal, &m1_calst);
+	cal_apply_cal(meas_inst->m2Raw, meas_inst->m2Cal, &m2_calst);
+
+	
 		
 
 	//  Calculate instrument inclination, roll, azimuth, declination
@@ -88,14 +75,14 @@ void quick_measurement(struct MEASUREMENT *meas_inst){
 
 
 
-void full_measurement(struct MEASUREMENT *meas_inst, bool calibrate_data){
+void full_measurement(struct MEASUREMENT *meas_inst, uint8_t shot_delay){
 	uint8_t i;
-	uint32_t refMs1;
+	uint32_t refMs;
 	enum LASER_MESSAGE_TYPE debugLM;
-	float a1temp[3], a2temp[3], c1temp[3], c2temp[3];
+	float a1temp[3], a2temp[3], m1temp[3], m2temp[3];
 	
 	//Delay
-	laser_delay(options.shot_delay);//  Beep then delay for 1 second
+	laser_delay(shot_delay);//  Beep then delay for 1 second
 	laser_beep();
 	delay_ms(100);//  Avoids cutting off the beep too quickly with another command
 	
@@ -107,10 +94,10 @@ void full_measurement(struct MEASUREMENT *meas_inst, bool calibrate_data){
 		
 	// Initialize structure
 	for (i=0;i<3;i++){
-		meas_inst->a1xyz[i] = 0;
-		meas_inst->a2xyz[i] = 0;
-		meas_inst->c1xyz[i] = 0;
-		meas_inst->c2xyz[i] = 0;
+		meas_inst->a1Raw[i] = 0;
+		meas_inst->a2Raw[i] = 0;
+		meas_inst->m1Raw[i] = 0;
+		meas_inst->m2Raw[i] = 0;
 	}
 	meas_inst->num_errors = 0;
 	meas_inst->samples = 0;
@@ -118,24 +105,22 @@ void full_measurement(struct MEASUREMENT *meas_inst, bool calibrate_data){
 	//Initiate Laser Measurement	
 	rxBufferLaserClear();
 	writeLaser(cmd_laser_single, sizeof(cmd_laser_single));
-	refMs1 = rtc_count_get_count(&rtc1); //  Background clock running at 1000hz
+	refMs = getCurrentMs(); //  Background clock running at 1000hz
 	while(1){
 		//Take measurements while laser is responding
 		read_accel(&slave_acc1,a1temp);
 		read_accel(&slave_acc2, a2temp);
-		read_mag(&slave_mag1, c1temp);
-		read_mag(&slave_mag2, c2temp);
+		read_mag_double(m1temp, m2temp);
 		for (i=0;i<3;i++){
-			meas_inst->a1xyz[i] += a1temp[i];
-			meas_inst->a2xyz[i] += a2temp[i];
-			meas_inst->c1xyz[i] += c1temp[i];
-			meas_inst->c2xyz[i] += c2temp[i];
+			meas_inst->a1Raw[i] += a1temp[i];
+			meas_inst->a2Raw[i] += a2temp[i];
+			meas_inst->m1Raw[i] += m1temp[i];
+			meas_inst->m2Raw[i] += m2temp[i];
 		}
 		meas_inst->samples += 1;
 		
-		meas_inst->readTimeMs = rtc_count_get_count(&rtc1)-refMs1;
-		//deltaMs = rtc_count_get_count(&rtc1)-refMs1; //  Background clock running at 1000hz
-		if (meas_inst->readTimeMs > timeOutMs){
+		meas_inst->readTimeMs = getCurrentMs()-refMs;
+		if (meas_inst->readTimeMs > MEASUREMENT_TIMEOUT){
 			//usart_abort_job(&usart_laser, USART_TRANSCEIVER_RX);
 			break;
 		}
@@ -148,13 +133,14 @@ void full_measurement(struct MEASUREMENT *meas_inst, bool calibrate_data){
 	
 	// Parse Laser rangefinder data and populate measurement structure
 	laser_parse_buffer(meas_inst);
-	if (calibrate_data){
-		// Note:  Laser rangefinder results always in meters
-		//  distance offset is in meters
-		meas_inst->distance = meas_inst->distance+dist_calst.dist_offset;
-	}
+	
+	//  Calibrate Distance
+	// Note:  Laser rangefinder results always in meters
+	//  distance offset is in meters
+	meas_inst->distCal = meas_inst->distRaw+dist_calst.dist_offset;
 	if (options.current_unit_dist == feet){
-		meas_inst->distance = meas_inst->distance * mt2ft;//convert from meters to feet
+		meas_inst->distRaw = meas_inst->distRaw * MT2FT;//convert from meters to feet
+		meas_inst->distCal = meas_inst->distCal * MT2FT;//convert from meters to feet
 		meas_inst->distance_units = feet;
 	}else{
 		meas_inst->distance_units = meters;
@@ -162,27 +148,22 @@ void full_measurement(struct MEASUREMENT *meas_inst, bool calibrate_data){
 	
 	// Divide measurements by samples for average.
 	for (i=0;i<3;i++){
-		meas_inst->a1xyz[i] =meas_inst->a1xyz[i] / meas_inst->samples;
-		meas_inst->a2xyz[i] =meas_inst->a2xyz[i] / meas_inst->samples;
-		meas_inst->c1xyz[i] =meas_inst->c1xyz[i] / meas_inst->samples;
-		meas_inst->c2xyz[i] =meas_inst->c2xyz[i] / meas_inst->samples;
+		meas_inst->a1Raw[i] =meas_inst->a1Raw[i] / meas_inst->samples;
+		meas_inst->a2Raw[i] =meas_inst->a2Raw[i] / meas_inst->samples;
+		meas_inst->m1Raw[i] =meas_inst->m1Raw[i] / meas_inst->samples;
+		meas_inst->m2Raw[i] =meas_inst->m2Raw[i] / meas_inst->samples;
 	}
 	//  Calibrate Results
-	if (calibrate_data){
-		cal_apply_cal(meas_inst->a1xyz, meas_inst->a1xyz, &a1_calst);
-		cal_apply_cal(meas_inst->a2xyz, meas_inst->a2xyz, &a2_calst);
-		cal_apply_cal(meas_inst->c1xyz, meas_inst->c1xyz, &c1_calst);
-		cal_apply_cal(meas_inst->c2xyz, meas_inst->c2xyz, &c2_calst);
-		
-	}	
+	cal_apply_cal(meas_inst->a1Raw, meas_inst->a1Cal, &a1_calst);
+	cal_apply_cal(meas_inst->a2Raw, meas_inst->a2Cal, &a2_calst);
+	cal_apply_cal(meas_inst->m1Raw, meas_inst->m1Cal, &m1_calst);
+	cal_apply_cal(meas_inst->m2Raw, meas_inst->m2Cal, &m2_calst);
+
 	// Calculate inclination and compass readings
 	calc_orientation(meas_inst);
 	
 	// Perform Error Checking
-	if (calibrate_data){//  Only perform error checking if data is calibrated
-		error_check(meas_inst);
-	}
-	
+	error_check(meas_inst);
 	
 	// Add Time-Stamp
 	get_time();
@@ -198,9 +179,8 @@ void full_measurement(struct MEASUREMENT *meas_inst, bool calibrate_data){
 	}	
 	
 	//  Turn backlight back on
-	backlightOn();
-	//  Configure SPI to speak to LCD	
-	//config_spi(LCD);	
+	backlightOn(&options.backlight_setting);
+
 }
 
 
@@ -245,19 +225,19 @@ void laser_parse_buffer(struct MEASUREMENT *meas_inst){
 		meas_inst->measurement_error[meas_inst->num_errors] = laser_pattern_error; 		
 		meas_inst->measurement_error_data1[meas_inst->num_errors] = 0;
 		increment_error_count(meas_inst);
-		meas_inst->distance = 0;
+		meas_inst->distRaw = 0;
 		return;
-	}else if(meas_inst->readTimeMs > timeOutMs){//timeout error
+	}else if(meas_inst->readTimeMs > MEASUREMENT_TIMEOUT){//timeout error
 		meas_inst->measurement_error[meas_inst->num_errors] = laser_response_timeout;
 		meas_inst->measurement_error_data1[meas_inst->num_errors] = meas_inst->samples;
 		increment_error_count(meas_inst);
-		meas_inst->distance = 0;
+		meas_inst->distRaw = 0;
 		return;
 	}else if(rxBufferLaser[AA_index+2]!=0x44){
 		meas_inst->measurement_error[meas_inst->num_errors] = laser_wrong_message;
 		meas_inst->measurement_error_data1[meas_inst->num_errors] = rxBufferLaser[AA_index+2];
 		increment_error_count(meas_inst);
-		meas_inst->distance = 0;
+		meas_inst->distRaw = 0;
 		return;		
 	}else if (rxBufferLaser[AA_index+3]=='E'){//rangefinder generated error
 		temp_err = 0;
@@ -282,19 +262,19 @@ void laser_parse_buffer(struct MEASUREMENT *meas_inst){
 		}
 		meas_inst->measurement_error_data1[meas_inst->num_errors] = 0;
 		increment_error_count(meas_inst);
-		meas_inst->distance = 0;
+		meas_inst->distRaw = 0;
 		return;
 	}else{
 		//  No error, proceed with parsing string into distance measurement
 		mult = 100000;
 		temp1=0;
-		meas_inst->distance = 0;
+		meas_inst->distRaw = 0;
 		for(i=3; i<9; i++){
 			temp1=rxBufferLaser[AA_index+i] & mask;
-			meas_inst->distance=meas_inst->distance + temp1*mult;
+			meas_inst->distRaw=meas_inst->distRaw + temp1*mult;
 			mult=mult/10;
 		}
-		meas_inst->distance=meas_inst->distance/1000;
+		meas_inst->distRaw=meas_inst->distRaw/1000;
 	}
 }
 
@@ -321,7 +301,7 @@ void rangefinder_on_off(bool on_off){
 		ioport_set_pin_level(laser_reset, false);
 	}
 
-	laser_triggered = false;
+	laserStatus = false;
 
 }
 
@@ -331,14 +311,14 @@ void laser_on_off(bool on_off){
 	if(on_off){
 		writeLaser(cmd_laser_on, sizeof(cmd_laser_on));
 		while(!isLaserTransmitComplete());
-		laser_triggered = true;
-		laser_timeout_timer(true);
+		laserStatus = true;
+		//laser_timeout_timer(true);
 	}else{
 		writeLaser(cmd_laser_off, sizeof(cmd_laser_off));
 		//usart_write_buffer_job(&usart_laser, cmd_laser_off, 5);
 		while(!isLaserTransmitComplete());
-		laser_triggered = false;
-		laser_timeout_timer(false);
+		laserStatus = false;
+		//laser_timeout_timer(false);
 	}
 	
 }
@@ -434,71 +414,103 @@ void setup_accel(struct spi_slave_inst *const sensor){
 
 
 
-
-uint8_t read_mag(struct spi_slave_inst *const sensor, float vector[3]){
-	uint8_t write_buffer[2];
-	uint8_t read_buffer[9];
-	uint8_t data_ready;
+uint8_t read_mag_double( float mag1[3],float mag2[3]){
+	uint8_t write_buffer[10];
+	uint8_t read_buffer[10];
 	uint8_t counter1;
 	uint8_t i;
-	//select sensor
-	// Assumes SPI already set up for sensors
-	spi_select_slave(&spi_main, sensor, true);
-
-	//Send Send Poll command to 0x00
-	write_buffer[0]=0x00; //poll register
-	write_buffer[1]=0x70; //set to poll X,Y,Z
-	spi_write_buffer_wait(&spi_main, write_buffer, 2);
-	spi_select_slave(&spi_main, sensor, false);
-	delay_us(1);
-	data_ready=0x00;
-	counter1 = 0x00;
-	while(!data_ready){
-		spi_select_slave(&spi_main, sensor, true);
-		write_buffer[0]=0xB4;
-		write_buffer[1]=0xFF;
-		spi_transceive_buffer_wait(&spi_main, write_buffer, read_buffer, 2);
-		data_ready=read_buffer[1];
-		data_ready=data_ready & 0x80;
-		counter1=counter1+1;
-		spi_select_slave(&spi_main, sensor, false);
-		delay_us(1);
-		if(counter1==0xFF){break;}
-	}
-	spi_select_slave(&spi_main, sensor, true);
-	write_buffer[0]=0xA4;
-	spi_write_buffer_wait(&spi_main, write_buffer, 1);
-	spi_read_buffer_wait(&spi_main, read_buffer, 9, 0xFF);
-	spi_select_slave(&spi_main, sensor, false);
-	delay_us(1);
+	bool data_ready;
 	
-	//  Assign readings to axis
-	vector[0]=parse_mag_data(&read_buffer[0]);
-	vector[1]=parse_mag_data(&read_buffer[3]);
-	vector[2]=-1* parse_mag_data(&read_buffer[6]);//Z axis inverted
+	float *vecPtr[2];
+	struct spi_slave_inst *slavePtr[2];
+	vecPtr[0] = mag1;
+	vecPtr[1] = mag2;
+	slavePtr[0] = &slave_mag1;
+	slavePtr[1] = &slave_mag2;
+	
+	// Poll XYZ command to address 0x00
+	write_buffer[0]=0x00; //poll register
+	write_buffer[1]=0x70; //set to poll X,Y,Z	
+	for (i=0;i<2;i++){
+		// Select Magnetometer 
+		spi_select_slave(&spi_main, slavePtr[i], true);
+		delay_us(1);
+		//Send Send Poll XYZ command to 0x00
+		spi_write_buffer_wait(&spi_main, write_buffer, 2);
+		spi_select_slave(&spi_main, slavePtr[i], false);
+		
+	}
+	//  Wait for Data to be ready
+	counter1 = 0x00;
+	write_buffer[0]=0xB4;
+	//  First poll mag1
+	for (i=0;i<2;i++){
+		
+		data_ready = false;
+		while(!data_ready){
+			delay_us(20);
+			spi_select_slave(&spi_main, slavePtr[i], true);
+			delay_us(1);
+			spi_transceive_buffer_wait(&spi_main, write_buffer, read_buffer, 2);
+			spi_select_slave(&spi_main, slavePtr[i], false);
+			
+			//  Check if data is ready
+			if (read_buffer[1] & 0x80){
+				data_ready = true;
+			}
+			
+			//  Check for time-out
+			counter1++;
+			if (counter1>=0xFF){
+				break;
+			}
+		}//  Loop checking for data ready
+	}//  Loop for each instrument
+	
+	//  Read Back Data
+	write_buffer[0] = 0xA4;	
+	for (i=0;i<2; i++){
+		spi_select_slave(&spi_main, slavePtr[i], true);
+		delay_us(1);		
+		spi_transceive_buffer_wait(&spi_main, write_buffer, read_buffer, 10);
+		spi_select_slave(&spi_main, slavePtr[i], false);
+		
+		parse_mag_arr(&read_buffer[1], vecPtr[i]);
+	
+	}
+	debug_ct1 = counter1;
+	return counter1;
+	
+}
+
+void  parse_mag_arr(uint8_t array[9], float data[3]){
+	uint8_t i;
+	int32_t temp;
 	
 	for (i=0;i<3;i++){
-		vector[i] = vector[i]/c_coarse_gain;
+		temp = 0x00;
+		if(array[i*3] & 0x80){//negative number
+			temp=0xff;
+			temp=temp<<8;
+		}
+		temp=temp+array[i*3];
+		temp=temp<<8;
+		temp=temp+array[i*3+1];
+		temp=temp<<8;
+		temp=temp+array[i*3+2];
+		data[i] = temp;
+		if (i==2){
+			//  Z axis inverted
+			data[i] = -1*data[i];
+		}
+		
+		//  Apply coarse gain		
+		data[i] = data[i]/c_coarse_gain;
+		
 	}
-	
-	return counter1;
 }
 
-float parse_mag_data(uint8_t data[3]){
-	float result;
-	int32_t temp=0x00000000;
-	if(data[0] & 0x80){//negative number
-		temp=0xff;
-		temp=temp<<8;
-	}
-	temp=temp+data[0];
-	temp=temp<<8;
-	temp=temp+data[1];
-	temp=temp<<8;
-	temp=temp+data[2];
-	result=temp;
-	return result;
-}
+
 
 void setup_mag(struct spi_slave_inst *const sensor){
 	uint8_t write_buffer[7];
@@ -544,10 +556,10 @@ void setup_mag(struct spi_slave_inst *const sensor){
 
 
 void adjustErrorSensitivity(void){
-	options.errorSensitivity = options.errorSensitivity+errorSensitivityAdjustmentIncrement;
+	options.errorSensitivity = options.errorSensitivity+STEP_ERROR_SENSITIVITY;
 	
-	if (options.errorSensitivity>errorSensitivityAdjustmentMax){
-		options.errorSensitivity = errorSensitivityAdjustmentMin;
+	if (options.errorSensitivity>MAX_ERROR_SENSITIVITY){
+		options.errorSensitivity = STEP_ERROR_SENSITIVITY;
 		
 	}
 	
@@ -568,7 +580,7 @@ bool increment_error_count(struct MEASUREMENT *meas_inst)
 }
 
 void error_check(struct MEASUREMENT *meas_inst){
-	float maga1, maga2, magc1, magc2, delta;
+	float magA1, magA2, magM1, magM2, delta;
 	float accel_err_limit, comp_err_limit;
 	float azm_arr[4]; float inc_arr[4];
 	float angMax, angMin;
@@ -577,66 +589,66 @@ void error_check(struct MEASUREMENT *meas_inst){
 	#define errlim_mag 200 // number of stdev's
 	#define errlim_disp 200 // number of stdev's
 	
-	accel_err_limit = errlim_mag*max(cal_report_azm_inc.mag_stdev_a1, cal_report_azm_inc.mag_stdev_a2);
-	comp_err_limit  = errlim_mag*max(cal_report_azm_inc.mag_stdev_c1, cal_report_azm_inc.mag_stdev_c2);
+	accel_err_limit = errlim_mag*max(cal_report.mag_stdev_a1, cal_report.mag_stdev_a2);
+	comp_err_limit  = errlim_mag*max(cal_report.mag_stdev_m1, cal_report.mag_stdev_m2);
 	
 	accel_err_limit = 0.5;
 	comp_err_limit  = 0.5;
 	
-	maga1 = calc_magnitude(meas_inst->a1xyz);
-	maga2 = calc_magnitude(meas_inst->a2xyz);
-	magc1 = calc_magnitude(meas_inst->c1xyz);
-	magc2 = calc_magnitude(meas_inst->c2xyz);
+	magA1 = calc_magnitude(meas_inst->a1Cal);
+	magA2 = calc_magnitude(meas_inst->a2Cal);
+	magM1 = calc_magnitude(meas_inst->m1Cal);
+	magM2 = calc_magnitude(meas_inst->m2Cal);
 		
 	//  Magnitude Check accelerometer 1
 	//mag = calc_magnitude(meas_inst->a1xyz);
-	delta = fabs(maga1-1);
-	if (fabs(maga1-1)>accel_err_limit)
+	delta = fabs(magA1-1);
+	if (fabs(magA1-1)>accel_err_limit)
 	{
 		meas_inst->measurement_error[meas_inst->num_errors] = accel1_mag_err;
-		meas_inst->measurement_error_data1[meas_inst->num_errors] = maga1;
+		meas_inst->measurement_error_data1[meas_inst->num_errors] = magA1;
 		increment_error_count(meas_inst);
 	}
 	//  Magnitude Check accelerometer 2
 	//mag = calc_magnitude(meas_inst->a2xyz);
-	delta = fabs(maga2-1);
+	delta = fabs(magA2-1);
 	if (delta>accel_err_limit)
 	{
 		meas_inst->measurement_error[meas_inst->num_errors] = accel2_mag_err;
-		meas_inst->measurement_error_data1[meas_inst->num_errors] = maga2;
+		meas_inst->measurement_error_data1[meas_inst->num_errors] = magA2;
 		increment_error_count(meas_inst);
 	}
 	//  Magnitude Check Compass 1
-	//mag = calc_magnitude(meas_inst->c1xyz);
-	delta = fabs(magc1-1);
+	//mag = calc_magnitude(meas_inst->m1xyz);
+	delta = fabs(magM1-1);
  	if (delta>comp_err_limit)
 	{
 		meas_inst->measurement_error[meas_inst->num_errors] = comp1_mag_err;
-		meas_inst->measurement_error_data1[meas_inst->num_errors] = magc1;
+		meas_inst->measurement_error_data1[meas_inst->num_errors] = magM1;
 		increment_error_count(meas_inst);
 
 	}
 	//  Magnitude Check Compass 2
-	//mag = calc_magnitude(meas_inst->c2xyz);
-	delta = fabs(magc2-1);
+	//mag = calc_magnitude(meas_inst->m2xyz);
+	delta = fabs(magM2-1);
 	if (delta>comp_err_limit)
 	{
 		meas_inst->measurement_error[meas_inst->num_errors] = comp2_mag_err;
-		meas_inst->measurement_error_data1[meas_inst->num_errors] = magc2;
+		meas_inst->measurement_error_data1[meas_inst->num_errors] = magM2;
 		increment_error_count(meas_inst);
 
 	}
 	
-	accel_err_limit = errlim_disp*max(cal_report_azm_inc.mag_stdev_a1, cal_report_azm_inc.mag_stdev_a2);
-	comp_err_limit  = errlim_disp*max(cal_report_azm_inc.mag_stdev_c1, cal_report_azm_inc.mag_stdev_c2);
+	accel_err_limit = errlim_disp*max(cal_report.mag_stdev_a1, cal_report.mag_stdev_a2);
+	comp_err_limit  = errlim_disp*max(cal_report.mag_stdev_m1, cal_report.mag_stdev_m2);
 	
 	
 	
 	// Axis check, Accelerometer
 	for (i=0;i<3;i++){
 		//  Cycle through all 3 axis
-		delta = fabs((meas_inst->a1xyz[i]/maga1) - (meas_inst->a2xyz[i]/maga2));
-		accel_err_limit = errlim_disp*cal_report_azm_inc.disp_stdev_acc[i];
+		delta = fabs((meas_inst->a1Cal[i]/magA1) - (meas_inst->a2Cal[i]/magA2));
+		accel_err_limit = errlim_disp*cal_report.disp_stdev_acc[i];
 		accel_err_limit = 0.5;
 		if (delta>accel_err_limit){
 			meas_inst->measurement_error[meas_inst->num_errors] = accel_disp_err;
@@ -647,10 +659,10 @@ void error_check(struct MEASUREMENT *meas_inst){
 		
 	}
 	
-	// Axis check, Accelerometer
+	// Axis check, Compass
 	for (i=0;i<3;i++){
-		delta = fabs((meas_inst->c1xyz[i]/magc1) - (meas_inst->c2xyz[i]/magc2));
-		comp_err_limit = errlim_mag*cal_report_azm_inc.disp_stdev_comp[i];
+		delta = fabs((meas_inst->m1Cal[i]/magM1) - (meas_inst->m2Cal[i]/magM2));
+		comp_err_limit = errlim_mag*cal_report.disp_stdev_comp[i];
 		comp_err_limit  = 0.5;
 		if (delta>comp_err_limit){
 			meas_inst->measurement_error[meas_inst->num_errors] = comp_disp_err;
@@ -664,10 +676,10 @@ void error_check(struct MEASUREMENT *meas_inst){
 	
 	
 	//  Check Angle Disparity
-	calc_azm_inc_roll_dec(meas_inst->a1xyz, meas_inst->c1xyz, &azm_arr[0], &inc_arr[0], &foo1, &foo2);
-	calc_azm_inc_roll_dec(meas_inst->a2xyz, meas_inst->c1xyz, &azm_arr[1], &inc_arr[1], &foo1, &foo2);
-	calc_azm_inc_roll_dec(meas_inst->a1xyz, meas_inst->c2xyz, &azm_arr[2], &inc_arr[2], &foo1, &foo2);
-	calc_azm_inc_roll_dec(meas_inst->a2xyz, meas_inst->c2xyz, &azm_arr[3], &inc_arr[3], &foo1, &foo2);
+	calc_azm_inc_roll_dec(meas_inst->a1Cal, meas_inst->m1Cal, &azm_arr[0], &inc_arr[0], &foo1, &foo2);
+	calc_azm_inc_roll_dec(meas_inst->a2Cal, meas_inst->m1Cal, &azm_arr[1], &inc_arr[1], &foo1, &foo2);
+	calc_azm_inc_roll_dec(meas_inst->a1Cal, meas_inst->m2Cal, &azm_arr[2], &inc_arr[2], &foo1, &foo2);
+	calc_azm_inc_roll_dec(meas_inst->a2Cal, meas_inst->m2Cal, &azm_arr[3], &inc_arr[3], &foo1, &foo2);
 	//  Check Inclinometer
 	angMin = inc_arr[0]; angMax = inc_arr[0];
 	for (i=1;i<4;i++){
@@ -696,7 +708,7 @@ void error_check(struct MEASUREMENT *meas_inst){
 		angMin = min(angMin, azm_arr[i]);
 		angMax = max(angMax, azm_arr[i]);
 	}
-	delta = (angMax-angMin)*cos(meas_inst->inclination*deg2rad); //  Adjust for high angle shots
+	delta = (angMax-angMin)*cos(meas_inst->inclination*DEG2RAD); //  Adjust for high angle shots
 	if (delta>options.errorSensitivity){
 		meas_inst->measurement_error[meas_inst->num_errors] = azm_ang_err;
 		meas_inst->measurement_error_data1[meas_inst->num_errors] = delta;
@@ -735,16 +747,16 @@ void gen_err_message(char *err_str, struct MEASUREMENT *meas_inst, uint8_t errN)
 			else{sprintf(err_str,"Comp2 Low: %0.4f", data1);}
 			break;
 		case accel_disp_err:
-			sprintf(err_str,"Acc delta ax%d: %0.3f%%", axis, 100*data1);
+			sprintf(err_str,"Acc delta ax%d %0.3f%%", axis, 100*data1);
 			break;
 		case comp_disp_err:
-			sprintf(err_str,"Cmp delta ax%d: %0.3f%%", axis, 100*data1);
+			sprintf(err_str,"Mag delta ax%d %0.3f%%", axis, 100*data1);
 			break;
 		case inc_ang_err:
-			sprintf(err_str,"Inc Delta: %0.3f deg", data1);
+			sprintf(err_str,"Inc Delta: %0.3fdeg", data1);
 			break;
 		case azm_ang_err:
-			sprintf(err_str,"Azm Delta: %0.3f deg", data1);
+			sprintf(err_str,"Azm Delta: %0.3fdeg", data1);
 			break;
 		case laser_calc_err:
 			sprintf(err_str,"laser calc error");
@@ -765,7 +777,7 @@ void gen_err_message(char *err_str, struct MEASUREMENT *meas_inst, uint8_t errN)
 			sprintf(err_str,"laser wrong message");
 			break;
 		default:
-			sprintf(err_str,"unrecognized error");	
+			sprintf(err_str,"unknown error %d",meas_inst->measurement_error[errN]);	
 	};
 	
 	

@@ -38,7 +38,6 @@
           <option id="common2.components.memory.sd_mmc" value="Add" config="spi" content-id="Atmel.ASF" />
           <option id="common2.services.delay" value="Add" config="systick" content-id="Atmel.ASF" />
           <option id="sam0.drivers.extint" value="Add" config="callback" content-id="Atmel.ASF" />
-          <option id="sam0.drivers.rtc" value="Add" config="count_callback" content-id="Atmel.ASF" />
           <option id="sam0.drivers.sercom.i2c.master" value="Add" config="callback" content-id="Atmel.ASF" />
           <option id="sam0.drivers.sercom.usart" value="Add" config="callback" content-id="Atmel.ASF" />
           <option id="sam0.drivers.system" value="Add" config="" content-id="Atmel.ASF" />
@@ -53,6 +52,7 @@
           <configuration key="config.common.services.fs.fatfs.codepage" value="sbcs" default="sbcs" content-id="Atmel.ASF" />
           <configuration key="config.common2.components.memory.sd_mmc.ctrl_access" value="disable" default="disable" content-id="Atmel.ASF" />
           <configuration key="config.sam0.drivers.sercom.spi" value="polled" default="callback" content-id="Atmel.ASF" />
+          <configuration key="config.sam0.drivers.rtc" value="count_callback" default="count_callback" content-id="Atmel.ASF" />
         </configurations>
         <files>
           <file path="src/main.c" framework="" version="" source="common2/applications/user_application/main.c" changed="False" content-id="Atmel.ASF" />
@@ -1597,6 +1597,12 @@
     <None Include="src\config\conf_usb.h">
       <SubType>compile</SubType>
     </None>
+    <Compile Include="src\BLE_func.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\BLE_func.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="src\clockSetup.c">
       <SubType>compile</SubType>
     </Compile>
@@ -1606,13 +1612,55 @@
     <None Include="src\config\conf_fatfs.h">
       <SubType>compile</SubType>
     </None>
+    <Compile Include="src\dispFunctions.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\dispFunctions.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="src\EEPROM.c">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\EEPROM.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="src\glcd\fonts\Bebas_Neue18x36_Numbers.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\glcd\fonts\Bebas_Neue20x36_Bold_Numbers.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\glcd\fonts\Earthbound_12x19_48to57.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\glcd\fonts\Liberation_Sans11x14_Numbers.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\glcd\fonts\Liberation_Sans15x21_Numbers.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\glcd\fonts\Liberation_Sans17x17_Alpha.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\glcd\fonts\Liberation_Sans20x28_Numbers.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\glcd\fonts\Liberation_Sans27x36_Numbers.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="src\main.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\mathBRIC.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\mathBRIC.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\SDcardBRIC.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\SDcardBRIC.h">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\sensors.c">
@@ -1768,31 +1816,7 @@
     <Compile Include="src\glcd\ATSAML21.h">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="src\glcd\fonts\Bebas_Neue18x36_Numbers.h">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="src\glcd\fonts\Bebas_Neue20x36_Bold_Numbers.h">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="src\glcd\fonts\Earthbound_12x19_48to57.h">
-      <SubType>compile</SubType>
-    </Compile>
     <Compile Include="src\glcd\fonts\font5x7.h">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="src\glcd\fonts\Liberation_Sans11x14_Numbers.h">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="src\glcd\fonts\Liberation_Sans15x21_Numbers.h">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="src\glcd\fonts\Liberation_Sans17x17_Alpha.h">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="src\glcd\fonts\Liberation_Sans20x28_Numbers.h">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="src\glcd\fonts\Liberation_Sans27x36_Numbers.h">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\glcd\glcd.c">
@@ -1829,12 +1853,6 @@
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\glcd\text_tiny.c">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="src\glcd\unit_tests.c">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="src\glcd\unit_tests.h">
       <SubType>compile</SubType>
     </Compile>
     <None Include="src\ASF\sam0\drivers\sercom\usart\quick_start_dma\qs_usart_dma_use.h">

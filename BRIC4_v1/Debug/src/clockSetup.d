@@ -1,5 +1,6 @@
 src/clockSetup.d src/clockSetup.o: ../src/clockSetup.c \
- ../src/clockSetup.h ../src/asf.h ../src/ASF/sam0/utils/compiler.h \
+ ../src/clockSetup.h ../src/main.h ../src/asf.h \
+ ../src/ASF/sam0/utils/compiler.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\lib\gcc\arm-none-eabi\6.3.1\include\stddef.h \
  ../src/ASF/common/utils/parts.h ../src/ASF/sam0/utils/status_codes.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\lib\gcc\arm-none-eabi\6.3.1\include\stdint.h \
@@ -195,9 +196,21 @@ src/clockSetup.d src/clockSetup.o: ../src/clockSetup.c \
  ../src/ASF/sam0/drivers/wdt/wdt.h \
  ../src/ASF/sam0/drivers/wdt/wdt_callback.h \
  ../src/ASF/sam0/drivers/wdt/wdt.h \
- ../src/ASF/sam0/drivers/wdt/wdt_callback.h
+ ../src/ASF/sam0/drivers/wdt/wdt_callback.h \
+ ../src/ASF/thirdparty/CMSIS/Include/arm_math.h \
+ ../src/ASF/thirdparty/CMSIS/Include/core_cm0plus.h \
+ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\math.h \
+ ../src/timers.h ../src/BLE_func.h ../src/comms/comms.h ../src/sensors.h \
+ ../src/mathBRIC.h ../src/calibration.h ../src/backlight.h \
+ ../src/dispFunctions.h ../src/SDcardBRIC.h ../src/EEPROM.h \
+ ../src/batteryManagement.h ../src/glcd\glcd.h ../src/glcd\ATSAML21.h \
+ ../src/glcd\ATSAML21.h ../src/glcd\ST7565R.h ../src/glcd\glcd_graphics.h \
+ ../src/glcd\glcd_text_tiny.h ../src/glcd\glcd_text.h \
+ ../src/glcd\fonts\font5x7.h ../src/glcd\glcd.h
 
 ../src/clockSetup.h:
+
+../src/main.h:
 
 ../src/asf.h:
 
@@ -608,3 +621,49 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-no
 ../src/ASF/sam0/drivers/wdt/wdt.h:
 
 ../src/ASF/sam0/drivers/wdt/wdt_callback.h:
+
+../src/ASF/thirdparty/CMSIS/Include/arm_math.h:
+
+../src/ASF/thirdparty/CMSIS/Include/core_cm0plus.h:
+
+c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\math.h:
+
+../src/timers.h:
+
+../src/BLE_func.h:
+
+../src/comms/comms.h:
+
+../src/sensors.h:
+
+../src/mathBRIC.h:
+
+../src/calibration.h:
+
+../src/backlight.h:
+
+../src/dispFunctions.h:
+
+../src/SDcardBRIC.h:
+
+../src/EEPROM.h:
+
+../src/batteryManagement.h:
+
+../src/glcd\glcd.h:
+
+../src/glcd\ATSAML21.h:
+
+../src/glcd\ATSAML21.h:
+
+../src/glcd\ST7565R.h:
+
+../src/glcd\glcd_graphics.h:
+
+../src/glcd\glcd_text_tiny.h:
+
+../src/glcd\glcd_text.h:
+
+../src/glcd\fonts\font5x7.h:
+
+../src/glcd\glcd.h:

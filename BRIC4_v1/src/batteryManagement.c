@@ -24,11 +24,8 @@ uint16_t VFull=0xD200;
 uint16_t HibCFG;
 float battVoltage;
 
-//  Battery Charger
-extern uint32_t chargeCurrent;
 
-//  Global Variables
-extern struct OPTIONS options;
+
 
 void setup_batt(void){
 	uint16_t data1;
@@ -95,12 +92,12 @@ uint16_t getBatteryLevel(void){
 }
 
 
-void setup_charger(void){
+void setChargeCurrent(uint32_t chargeCurrent){
 	// ILIM is lower 3 bits of addr 0x02
 	uint8_t data;
-	if (options.chargeCurrent==500){
+	if (chargeCurrent==500){
 		data = 0x06;
-		}else{
+	}else{
 		data = 0x00;
 	}
 	adp5062_reg_read_write(writep, 0x02, &data);

@@ -132,6 +132,13 @@ src/ASF/common2/components/memory/sd_mmc/sd_mmc.d \
  ../src/ASF/sam0/drivers/system/pinmux/pinmux.h \
  ../src/ASF/sam0/drivers/extint/extint_callback.h \
  ../src/ASF/sam0/drivers/extint/extint_callback.h \
+ ../src/ASF/thirdparty/fatfs/fatfs-r0.09/src/diskio.h \
+ ../src/ASF/thirdparty/fatfs/fatfs-r0.09/src/integer.h \
+ ../src/ASF/thirdparty/fatfs/fatfs-r0.09/src/ff.h \
+ ../src/ASF/thirdparty/fatfs/fatfs-r0.09/src/ffconf.h \
+ ../src/config/conf_fatfs.h \
+ ../src/ASF/thirdparty/fatfs/fatfs-r0.09/src/ffconf.h \
+ ../src/ASF/thirdparty/fatfs/fatfs-r0.09/src/integer.h \
  ../src/ASF/common/boards/board.h \
  ../src/ASF/common/services/ioport/ioport.h \
  ../src/ASF/common/services/ioport/sam0/ioport.h \
@@ -146,7 +153,20 @@ src/ASF/common2/components/memory/sd_mmc/sd_mmc.d \
  ../src/ASF/sam0/drivers/rtc/rtc_tamper.h \
  ../src/ASF/sam0/drivers/usb/stack_interface/usb_dual.h \
  ../src/ASF/common2/components/memory/sd_mmc/sd_mmc.h \
- ../src/config/conf_sd_mmc.h ../src/clockSetup.h \
+ ../src/config/conf_sd_mmc.h ../src/clockSetup.h ../src/main.h \
+ ../src/ASF/thirdparty/CMSIS/Include/arm_math.h \
+ ../src/ASF/thirdparty/CMSIS/Include/core_cm0plus.h \
+ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\string.h \
+ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\xlocale.h \
+ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\string.h \
+ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\math.h \
+ ../src/timers.h ../src/BLE_func.h ../src/comms/comms.h ../src/sensors.h \
+ ../src/mathBRIC.h ../src/calibration.h ../src/backlight.h \
+ ../src/dispFunctions.h ../src/SDcardBRIC.h ../src/EEPROM.h \
+ ../src/batteryManagement.h ../src/glcd\glcd.h ../src/glcd\ATSAML21.h \
+ ../src/comms\comms.h ../src/glcd\ATSAML21.h ../src/glcd\ST7565R.h \
+ ../src/glcd\glcd_graphics.h ../src/glcd\glcd_text_tiny.h \
+ ../src/glcd\glcd_text.h ../src/glcd\fonts\font5x7.h ../src/glcd\glcd.h \
  ../src/ASF/sam0/drivers/sercom/sercom.h \
  ../src/ASF/sam0/drivers/system/system.h \
  ../src/ASF/sam0/drivers/system/power/power_sam_l/power.h \
@@ -159,13 +179,7 @@ src/ASF/common2/components/memory/sd_mmc/sd_mmc.d \
  ../src/ASF/sam0/drivers/sercom/i2c/i2c_common.h \
  ../src/ASF/sam0/drivers/sercom/i2c/i2c_master_interrupt.h \
  ../src/ASF/sam0/drivers/sercom/i2c/i2c_master.h \
- ../src/ASF/sam0/drivers/sercom/spi/spi.h \
- c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\string.h \
- c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\xlocale.h \
- c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\string.h \
- ../src/config/conf_spi.h \
- ../src/ASF/sam0/drivers/sercom/spi/spi_interrupt.h \
- ../src/ASF/sam0/drivers/sercom/spi/spi.h \
+ ../src/ASF/sam0/drivers/sercom/spi/spi.h ../src/config/conf_spi.h \
  ../src/ASF/sam0/drivers/sercom/usart/usart.h \
  ../src/ASF/sam0/drivers/sercom/usart/usart_interrupt.h \
  ../src/ASF/sam0/drivers/sercom/usart/usart.h \
@@ -466,6 +480,20 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-no
 
 ../src/ASF/sam0/drivers/extint/extint_callback.h:
 
+../src/ASF/thirdparty/fatfs/fatfs-r0.09/src/diskio.h:
+
+../src/ASF/thirdparty/fatfs/fatfs-r0.09/src/integer.h:
+
+../src/ASF/thirdparty/fatfs/fatfs-r0.09/src/ff.h:
+
+../src/ASF/thirdparty/fatfs/fatfs-r0.09/src/ffconf.h:
+
+../src/config/conf_fatfs.h:
+
+../src/ASF/thirdparty/fatfs/fatfs-r0.09/src/ffconf.h:
+
+../src/ASF/thirdparty/fatfs/fatfs-r0.09/src/integer.h:
+
 ../src/ASF/common/boards/board.h:
 
 ../src/ASF/common/services/ioport/ioport.h:
@@ -502,6 +530,62 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-no
 
 ../src/clockSetup.h:
 
+../src/main.h:
+
+../src/ASF/thirdparty/CMSIS/Include/arm_math.h:
+
+../src/ASF/thirdparty/CMSIS/Include/core_cm0plus.h:
+
+c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\string.h:
+
+c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\xlocale.h:
+
+c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\string.h:
+
+c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\math.h:
+
+../src/timers.h:
+
+../src/BLE_func.h:
+
+../src/comms/comms.h:
+
+../src/sensors.h:
+
+../src/mathBRIC.h:
+
+../src/calibration.h:
+
+../src/backlight.h:
+
+../src/dispFunctions.h:
+
+../src/SDcardBRIC.h:
+
+../src/EEPROM.h:
+
+../src/batteryManagement.h:
+
+../src/glcd\glcd.h:
+
+../src/glcd\ATSAML21.h:
+
+../src/comms\comms.h:
+
+../src/glcd\ATSAML21.h:
+
+../src/glcd\ST7565R.h:
+
+../src/glcd\glcd_graphics.h:
+
+../src/glcd\glcd_text_tiny.h:
+
+../src/glcd\glcd_text.h:
+
+../src/glcd\fonts\font5x7.h:
+
+../src/glcd\glcd.h:
+
 ../src/ASF/sam0/drivers/sercom/sercom.h:
 
 ../src/ASF/sam0/drivers/system/system.h:
@@ -528,17 +612,7 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-no
 
 ../src/ASF/sam0/drivers/sercom/spi/spi.h:
 
-c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\string.h:
-
-c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\xlocale.h:
-
-c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\string.h:
-
 ../src/config/conf_spi.h:
-
-../src/ASF/sam0/drivers/sercom/spi/spi_interrupt.h:
-
-../src/ASF/sam0/drivers/sercom/spi/spi.h:
 
 ../src/ASF/sam0/drivers/sercom/usart/usart.h:
 

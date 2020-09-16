@@ -86,8 +86,8 @@
 
 /* Define the SPI max clock */
 //#define SD_MMC_SPI_MAX_CLOCK       1000000
-//#define SD_MMC_SPI_MAX_CLOCK       10000000
-#define SD_MMC_SPI_MAX_CLOCK        2500000
+#define SD_MMC_SPI_MAX_CLOCK       1000000
+//#define SD_MMC_SPI_MAX_CLOCK        2500000
 //#define SD_MMC_SPI_MAX_CLOCK       24000000
 
 #endif /* CONF_SD_MMC_H_INCLUDED */

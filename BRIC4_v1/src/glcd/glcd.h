@@ -36,13 +36,13 @@
 #define _GLCD_H
 
 //#include <stm32f4xx.h>
-#include "glcd\ATSAML21.h"
+//#include "glcd\ATSAML21.h"
 //extern void delay_ms(uint32_t ms);
-#define PROGMEM
+
 
 #include "glcd\ATSAML21.h"
 #include <stdint.h>
-
+//#define PROGMEM
 
 /* Macros */
 
@@ -74,10 +74,10 @@ typedef struct {
 #include "ATSAML21.h"
 #include "ST7565R.h"
 #include "glcd_graphics.h"
-#include "glcd_graphs.h"
+//#include "glcd_graphs.h"
 #include "glcd_text_tiny.h"
 #include "glcd_text.h"
-#include "unit_tests.h"
+//#include "unit_tests.h"
 
 /**
  * \name Colour Constants

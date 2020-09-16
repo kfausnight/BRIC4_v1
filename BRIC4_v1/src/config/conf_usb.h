@@ -39,7 +39,7 @@
 
 #include "compiler.h"
 
-#warning You must refill the following definitions with a correct values
+//#warning You must refill the following definitions with a correct values
 
 /**
  * USB Device Configuration

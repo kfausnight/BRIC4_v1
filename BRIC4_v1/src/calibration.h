@@ -10,16 +10,12 @@
 #ifndef CALIBRATION_H_
 #define CALIBRATION_H_
 
-#include <stdint.h>
+#include <timers.h>
 #include <sensors.h>
-#include <math.h>
-//#include "FatFS_R13C\ff.h"
-//#include "FatFS_R13C\diskio.h"
-#include <clockSetup.h>
 
-#define nbuf		80
-#define group_size	4// For Azm/Inc calibration
-#define shot_size   4// For Distance calibration
+#include <stdint.h>
+#include <math.h>
+
 
 
 struct INST_CAL{
@@ -34,7 +30,6 @@ struct INST_CAL{
 	float thetaZ;
 	float RotM[3][3];
 	float dist_offset;
-	float angle_stdev;
 	
 } ;
 
@@ -42,47 +37,47 @@ struct CAL_REPORT{
 	float software_version;
 	uint32_t groups;
 	uint32_t points;
-	uint32_t timestamp;// posix time
+	uint32_t groupsAll;
+	uint32_t pointsAll;
+	uint32_t groupsRemoved[MAX_BAD_GROUPS];
 	float inc_angle_err, azm_angle_err;
-	float mag_stdev_a1, mag_stdev_a2, mag_stdev_c1, mag_stdev_c2;
+	float mag_stdev_a1, mag_stdev_a2, mag_stdev_m1, mag_stdev_m2;
 	float disp_stdev_acc[3];
 	float disp_stdev_comp[3];
-	struct Time time_struct;	
-	};
-
-enum CAL_TYPE{gain_offset, RotM, all};
+	struct TIME time_inc_azm;	
+	struct TIME time_quick_azm;	
+	struct TIME time_rangeFinder;	
+	
+};
 
 
 
 // Calibration Functions
-void cal_process_calibration(void);
+uint8_t cal_getGroupPoints(void);
+uint8_t cal_getCurrentGroup(void);
+void cal_init(void);
+void cal_resetGroup(void);
+uint32_t cal_removeGroup(bool *, uint32_t);
+void cal_findBadGroup(float [], float [], uint32_t *, float *);
+bool cal_checkStability(float [][3], float [3]);
+bool cal_azm_quick_add_point(float [][3], float [][3], uint32_t);
 void cal_init_struct(struct INST_CAL *);
 void cal_gain_off(float [][3], struct INST_CAL *);
 void cal_angleYZ(float[][3], struct INST_CAL *);
 void cal_angleX(float[][3], float[][3], struct INST_CAL *);
 void cal_apply_cal(float [3], float [3], struct INST_CAL *);
-void cal_add_datapoint(struct MEASUREMENT *, bool);
-void cal_evaluate(void);
-FRESULT cal_write_report(void);
+void cal_apply_cal_all(void);
+void cal_add_datapoint(struct MEASUREMENT *);
+void cal_inc_azm_eval(void);
+void cal_full_inc_azm_process(uint8_t);
+void cal_azm_quick_process(void);
+void cal_done(enum CALTYPE);
 void cal_add_dist(struct MEASUREMENT *);
 void cal_dist_process(void);
 void cal_loop_test(struct MEASUREMENT *);
 void cal_axis_misalignments(float [][3], struct INST_CAL *);
-void gen_RotM(struct INST_CAL *);
 
-// Math functions
-void inverse(float [][6], float [][6], uint8_t);
-void transpose(float [][6], float [][6], float [][6], uint8_t);
-float determinant(float [][6], uint8_t);
-void calc_theta_XY(float [3], float *, float *);
-void calc_azm_inc_roll_dec(float [3], float [3], float *, float *, float *, float *);
-void rotvec_theta_ZY(float [3], float [3], float, float);
-void rotvec_theta_XY(float [3], float [3], float, float);
-float stdev(float [], uint32_t);
-float calc_mag_stdev(float [][3]);
-float calc_disp_stdev(float [][3], float [][3], uint8_t);
-void mat_mult_33_31(float [3][3], float [3], float [3]);
-void calc_orientation(struct MEASUREMENT *);
+void gen_RotM(struct INST_CAL *);
 
 
 

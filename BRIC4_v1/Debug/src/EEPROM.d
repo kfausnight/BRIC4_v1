@@ -1,4 +1,7 @@
-src/EEPROM.d src/EEPROM.o: ../src/EEPROM.c \
+src/EEPROM.d src/EEPROM.o: ../src/EEPROM.c ../src/EEPROM.h ../src/main.h \
+ ../src/asf.h ../src/ASF/sam0/utils/compiler.h \
+ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\lib\gcc\arm-none-eabi\6.3.1\include\stddef.h \
+ ../src/ASF/common/utils/parts.h ../src/ASF/sam0/utils/status_codes.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\lib\gcc\arm-none-eabi\6.3.1\include\stdint.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\stdint.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\machine\_default_types.h \
@@ -6,10 +9,6 @@ src/EEPROM.d src/EEPROM.o: ../src/EEPROM.c \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\_newlib_version.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\_intsup.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\_stdint.h \
- ../src/EEPROM.h ../src/comms/comms.h ../src/asf.h \
- ../src/ASF/sam0/utils/compiler.h \
- c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\lib\gcc\arm-none-eabi\6.3.1\include\stddef.h \
- ../src/ASF/common/utils/parts.h ../src/ASF/sam0/utils/status_codes.h \
  ../src/ASF/sam0/utils/preprocessor/preprocessor.h \
  ../src/ASF/sam0/utils/preprocessor/tpaste.h \
  ../src/ASF/sam0/utils/preprocessor/stringz.h \
@@ -197,16 +196,31 @@ src/EEPROM.d src/EEPROM.o: ../src/EEPROM.c \
  ../src/ASF/sam0/drivers/wdt/wdt.h \
  ../src/ASF/sam0/drivers/wdt/wdt_callback.h \
  ../src/ASF/sam0/drivers/wdt/wdt.h \
- ../src/ASF/sam0/drivers/wdt/wdt_callback.h ../src/calibration.h \
- ../src/sensors.h ../src/main.h ../src/glcd\glcd.h ../src/glcd\ATSAML21.h \
- ../src/glcd\ATSAML21.h ../src/glcd\ST7565R.h ../src/glcd\glcd_graphics.h \
- ../src/glcd\glcd_graphs.h ../src/glcd\glcd_text_tiny.h \
- ../src/glcd\glcd_text.h ../src/glcd\unit_tests.h \
- ../src/glcd\fonts\font5x7.h \
+ ../src/ASF/sam0/drivers/wdt/wdt_callback.h \
  ../src/ASF/thirdparty/CMSIS/Include/arm_math.h \
  ../src/ASF/thirdparty/CMSIS/Include/core_cm0plus.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\math.h \
- ../src/timers.h ../src/backlight.h ../src/batteryManagement.h
+ ../src/timers.h ../src/BLE_func.h ../src/comms/comms.h ../src/sensors.h \
+ ../src/mathBRIC.h ../src/calibration.h ../src/backlight.h \
+ ../src/dispFunctions.h ../src/SDcardBRIC.h ../src/batteryManagement.h \
+ ../src/glcd\glcd.h ../src/glcd\ATSAML21.h ../src/glcd\ATSAML21.h \
+ ../src/glcd\ST7565R.h ../src/glcd\glcd_graphics.h \
+ ../src/glcd\glcd_text_tiny.h ../src/glcd\glcd_text.h \
+ ../src/glcd\fonts\font5x7.h ../src/glcd\glcd.h
+
+../src/EEPROM.h:
+
+../src/main.h:
+
+../src/asf.h:
+
+../src/ASF/sam0/utils/compiler.h:
+
+c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\lib\gcc\arm-none-eabi\6.3.1\include\stddef.h:
+
+../src/ASF/common/utils/parts.h:
+
+../src/ASF/sam0/utils/status_codes.h:
 
 c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\lib\gcc\arm-none-eabi\6.3.1\include\stdint.h:
 
@@ -221,20 +235,6 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-no
 c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\_intsup.h:
 
 c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\_stdint.h:
-
-../src/EEPROM.h:
-
-../src/comms/comms.h:
-
-../src/asf.h:
-
-../src/ASF/sam0/utils/compiler.h:
-
-c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\lib\gcc\arm-none-eabi\6.3.1\include\stddef.h:
-
-../src/ASF/common/utils/parts.h:
-
-../src/ASF/sam0/utils/status_codes.h:
 
 ../src/ASF/sam0/utils/preprocessor/preprocessor.h:
 
@@ -624,11 +624,31 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-no
 
 ../src/ASF/sam0/drivers/wdt/wdt_callback.h:
 
-../src/calibration.h:
+../src/ASF/thirdparty/CMSIS/Include/arm_math.h:
+
+../src/ASF/thirdparty/CMSIS/Include/core_cm0plus.h:
+
+c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\math.h:
+
+../src/timers.h:
+
+../src/BLE_func.h:
+
+../src/comms/comms.h:
 
 ../src/sensors.h:
 
-../src/main.h:
+../src/mathBRIC.h:
+
+../src/calibration.h:
+
+../src/backlight.h:
+
+../src/dispFunctions.h:
+
+../src/SDcardBRIC.h:
+
+../src/batteryManagement.h:
 
 ../src/glcd\glcd.h:
 
@@ -640,24 +660,10 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-no
 
 ../src/glcd\glcd_graphics.h:
 
-../src/glcd\glcd_graphs.h:
-
 ../src/glcd\glcd_text_tiny.h:
 
 ../src/glcd\glcd_text.h:
 
-../src/glcd\unit_tests.h:
-
 ../src/glcd\fonts\font5x7.h:
 
-../src/ASF/thirdparty/CMSIS/Include/arm_math.h:
-
-../src/ASF/thirdparty/CMSIS/Include/core_cm0plus.h:
-
-c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\math.h:
-
-../src/timers.h:
-
-../src/backlight.h:
-
-../src/batteryManagement.h:
+../src/glcd\glcd.h:
