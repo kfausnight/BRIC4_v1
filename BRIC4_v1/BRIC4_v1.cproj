@@ -38,7 +38,7 @@
           <option id="common2.components.memory.sd_mmc" value="Add" config="spi" content-id="Atmel.ASF" />
           <option id="common2.services.delay" value="Add" config="systick" content-id="Atmel.ASF" />
           <option id="sam0.drivers.extint" value="Add" config="callback" content-id="Atmel.ASF" />
-          <option id="sam0.drivers.sercom.i2c.master" value="Add" config="callback" content-id="Atmel.ASF" />
+          <option id="sam0.drivers.sercom.i2c.master" value="Add" config="polled" content-id="Atmel.ASF" />
           <option id="sam0.drivers.sercom.usart" value="Add" config="callback" content-id="Atmel.ASF" />
           <option id="sam0.drivers.system" value="Add" config="" content-id="Atmel.ASF" />
           <option id="sam0.drivers.system.clock" value="Add" config="" content-id="Atmel.ASF" />
@@ -102,9 +102,6 @@
           <file path="src/ASF/sam0/drivers/sercom/usart/usart.h" framework="" version="3.47.0" source="sam0\drivers\sercom\usart\usart.h" changed="False" content-id="Atmel.ASF" />
           <file path="src/ASF/sam0/drivers/sercom/usart/quick_start_dma/qs_usart_dma_use.h" framework="" version="3.47.0" source="sam0\drivers\sercom\usart\quick_start_dma\qs_usart_dma_use.h" changed="False" content-id="Atmel.ASF" />
           <file path="src/ASF/sam0/drivers/sercom/sercom_interrupt.h" framework="" version="3.47.0" source="sam0\drivers\sercom\sercom_interrupt.h" changed="False" content-id="Atmel.ASF" />
-          <file path="src/ASF/sam0/drivers/sercom/i2c/i2c_master_interrupt.h" framework="" version="3.47.0" source="sam0\drivers\sercom\i2c\i2c_master_interrupt.h" changed="False" content-id="Atmel.ASF" />
-          <file path="src/ASF/sam0/drivers/sercom/i2c/quick_start_master_callback/qs_i2c_master_callback.h" framework="" version="3.47.0" source="sam0\drivers\sercom\i2c\quick_start_master_callback\qs_i2c_master_callback.h" changed="False" content-id="Atmel.ASF" />
-          <file path="src/ASF/sam0/drivers/sercom/i2c/i2c_sam0/i2c_master_interrupt.c" framework="" version="3.47.0" source="sam0\drivers\sercom\i2c\i2c_sam0\i2c_master_interrupt.c" changed="False" content-id="Atmel.ASF" />
           <file path="src/ASF/sam0/drivers/sercom/sercom_interrupt.c" framework="" version="3.47.0" source="sam0\drivers\sercom\sercom_interrupt.c" changed="False" content-id="Atmel.ASF" />
           <file path="src/ASF/sam0/drivers/sercom/usart/usart_interrupt.c" framework="" version="3.47.0" source="sam0\drivers\sercom\usart\usart_interrupt.c" changed="False" content-id="Atmel.ASF" />
           <file path="src/ASF/sam0/drivers/sercom/usart/quick_start_lin/qs_lin.h" framework="" version="3.47.0" source="sam0\drivers\sercom\usart\quick_start_lin\qs_lin.h" changed="False" content-id="Atmel.ASF" />
@@ -408,9 +405,7 @@
   <armgcc.common.outputfiles.srec>True</armgcc.common.outputfiles.srec>
   <armgcc.compiler.symbols.DefSymbols>
     <ListValues>
-      <Value>NDEBUG</Value>
       <Value>SYSTICK_MODE</Value>
-      <Value>I2C_MASTER_CALLBACK_MODE=true</Value>
       <Value>USART_CALLBACK_MODE=true</Value>
       <Value>EXTINT_CALLBACK_MODE=true</Value>
       <Value>RTC_COUNT_ASYNC=true</Value>
@@ -422,6 +417,8 @@
       <Value>BOARD=USER_BOARD</Value>
       <Value>ARM_MATH_CM0PLUS=true</Value>
       <Value>SPI_CALLBACK_MODE=false</Value>
+      <Value>NDEBUG</Value>
+      <Value>I2C_MASTER_CALLBACK_MODE=false</Value>
     </ListValues>
   </armgcc.compiler.symbols.DefSymbols>
   <armgcc.compiler.directories.IncludePaths>
@@ -478,6 +475,7 @@
       <Value>../src/ASF/thirdparty/fatfs/fatfs-port-r0.09/sam0</Value>
     </ListValues>
   </armgcc.compiler.directories.IncludePaths>
+  <armgcc.compiler.optimization.level>Optimize most (-O3)</armgcc.compiler.optimization.level>
   <armgcc.compiler.optimization.OtherFlags>-fdata-sections</armgcc.compiler.optimization.OtherFlags>
   <armgcc.compiler.optimization.PrepareFunctionsForGarbageCollection>True</armgcc.compiler.optimization.PrepareFunctionsForGarbageCollection>
   <armgcc.compiler.warnings.AllWarnings>True</armgcc.compiler.warnings.AllWarnings>
@@ -551,7 +549,7 @@
       <Value>../src/ASF/thirdparty/fatfs/fatfs-port-r0.09/sam0</Value>
     </ListValues>
   </armgcc.assembler.general.IncludePaths>
-  <armgcc.preprocessingassembler.general.AssemblerFlags>-DARM_MATH_CM0PLUS=true -DSYSTICK_MODE -DI2C_MASTER_CALLBACK_MODE=true -DUSART_CALLBACK_MODE=true -DEXTINT_CALLBACK_MODE=true -DRTC_COUNT_ASYNC=true -DTC_ASYNC=true -DWDT_CALLBACK_MODE=true -DUSB_DEVICE_LPM_SUPPORT -DUDD_ENABLE -DACCESS_USB_ENABLED -DBOARD=USER_BOARD -DSPI_CALLBACK_MODE=false</armgcc.preprocessingassembler.general.AssemblerFlags>
+  <armgcc.preprocessingassembler.general.AssemblerFlags>-DARM_MATH_CM0PLUS=true -DSYSTICK_MODE -DUSART_CALLBACK_MODE=true -DEXTINT_CALLBACK_MODE=true -DRTC_COUNT_ASYNC=true -DTC_ASYNC=true -DWDT_CALLBACK_MODE=true -DUSB_DEVICE_LPM_SUPPORT -DUDD_ENABLE -DACCESS_USB_ENABLED -DBOARD=USER_BOARD -DSPI_CALLBACK_MODE=false -DI2C_MASTER_CALLBACK_MODE=false</armgcc.preprocessingassembler.general.AssemblerFlags>
   <armgcc.preprocessingassembler.general.IncludePaths>
     <ListValues>
       <Value>../src/ASF/sam0/drivers/system</Value>
@@ -619,20 +617,19 @@
   <armgcc.common.outputfiles.srec>True</armgcc.common.outputfiles.srec>
   <armgcc.compiler.symbols.DefSymbols>
     <ListValues>
-      <Value>DEBUG</Value>
       <Value>SYSTICK_MODE</Value>
-      <Value>I2C_MASTER_CALLBACK_MODE=true</Value>
       <Value>USART_CALLBACK_MODE=true</Value>
       <Value>EXTINT_CALLBACK_MODE=true</Value>
-      <Value>RTC_COUNT_ASYNC=true</Value>
       <Value>TC_ASYNC=true</Value>
       <Value>WDT_CALLBACK_MODE=true</Value>
       <Value>USB_DEVICE_LPM_SUPPORT</Value>
       <Value>UDD_ENABLE</Value>
       <Value>ACCESS_USB_ENABLED</Value>
-      <Value>SPI_CALLBACK_MODE=false</Value>
       <Value>BOARD=USER_BOARD</Value>
       <Value>ARM_MATH_CM0PLUS=true</Value>
+      <Value>SPI_CALLBACK_MODE=false</Value>
+      <Value>DEBUG</Value>
+      <Value>I2C_MASTER_CALLBACK_MODE=false</Value>
     </ListValues>
   </armgcc.compiler.symbols.DefSymbols>
   <armgcc.compiler.directories.IncludePaths>
@@ -708,7 +705,7 @@
   </armgcc.linker.libraries.LibrarySearchPaths>
   <armgcc.linker.optimization.GarbageCollectUnusedSections>True</armgcc.linker.optimization.GarbageCollectUnusedSections>
   <armgcc.linker.memorysettings.ExternalRAM />
-  <armgcc.linker.miscellaneous.LinkerFlags>-Wl,--entry=Reset_Handler -Wl,--cref -mthumb -T../src/ASF/sam0/utils/linker_scripts/saml21/gcc/saml21g18b_flash.ld</armgcc.linker.miscellaneous.LinkerFlags>
+  <armgcc.linker.miscellaneous.LinkerFlags>-Wl,--entry=Reset_Handler -Wl,--cref -mthumb -T../src/ASF/sam0/utils/linker_scripts/saml21/gcc/saml21g18b_flash.ld  -Wl,--section-start=.text=0x6000</armgcc.linker.miscellaneous.LinkerFlags>
   <armgcc.assembler.general.IncludePaths>
     <ListValues>
       <Value>../src/ASF/sam0/drivers/system</Value>
@@ -764,7 +761,7 @@
     </ListValues>
   </armgcc.assembler.general.IncludePaths>
   <armgcc.assembler.debugging.DebugLevel>Default (-g)</armgcc.assembler.debugging.DebugLevel>
-  <armgcc.preprocessingassembler.general.AssemblerFlags>-DARM_MATH_CM0PLUS=true -DSYSTICK_MODE -DI2C_MASTER_CALLBACK_MODE=true -DUSART_CALLBACK_MODE=true -DEXTINT_CALLBACK_MODE=true -DRTC_COUNT_ASYNC=true -DTC_ASYNC=true -DWDT_CALLBACK_MODE=true -DUSB_DEVICE_LPM_SUPPORT -DUDD_ENABLE -DACCESS_USB_ENABLED -DBOARD=USER_BOARD -DSPI_CALLBACK_MODE=false</armgcc.preprocessingassembler.general.AssemblerFlags>
+  <armgcc.preprocessingassembler.general.AssemblerFlags>-DARM_MATH_CM0PLUS=true -DSYSTICK_MODE -DUSART_CALLBACK_MODE=true -DEXTINT_CALLBACK_MODE=true -DRTC_COUNT_ASYNC=true -DTC_ASYNC=true -DWDT_CALLBACK_MODE=true -DUSB_DEVICE_LPM_SUPPORT -DUDD_ENABLE -DACCESS_USB_ENABLED -DBOARD=USER_BOARD -DSPI_CALLBACK_MODE=false -DI2C_MASTER_CALLBACK_MODE=false</armgcc.preprocessingassembler.general.AssemblerFlags>
   <armgcc.preprocessingassembler.general.IncludePaths>
     <ListValues>
       <Value>../src/ASF/sam0/drivers/system</Value>
@@ -857,13 +854,10 @@
     <Folder Include="src\ASF\sam0\drivers\extint\extint_sam_l_c\" />
     <Folder Include="src\ASF\sam0\drivers\port\" />
     <Folder Include="src\ASF\sam0\drivers\port\quick_start\" />
-    <Folder Include="src\ASF\sam0\drivers\rtc\" />
-    <Folder Include="src\ASF\sam0\drivers\rtc\rtc_sam_l_c\" />
     <Folder Include="src\ASF\sam0\drivers\sercom\" />
     <Folder Include="src\ASF\sam0\drivers\sercom\i2c\" />
     <Folder Include="src\ASF\sam0\drivers\sercom\i2c\i2c_sam0\" />
     <Folder Include="src\ASF\sam0\drivers\sercom\i2c\quick_start_master\" />
-    <Folder Include="src\ASF\sam0\drivers\sercom\i2c\quick_start_master_callback\" />
     <Folder Include="src\ASF\sam0\drivers\sercom\i2c\quick_start_master_dma\" />
     <Folder Include="src\ASF\sam0\drivers\sercom\spi\" />
     <Folder Include="src\ASF\sam0\drivers\sercom\spi\quick_start_dma\" />
@@ -1603,6 +1597,18 @@
     <Compile Include="src\BLE_func.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="src\buttons.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\buttons.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\Buzzer.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\Buzzer.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="src\clockSetup.c">
       <SubType>compile</SubType>
     </Compile>
@@ -1622,6 +1628,12 @@
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\EEPROM.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\errorsBRIC4.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\errorsBRIC4.h">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\glcd\fonts\Bebas_Neue18x36_Numbers.h">
@@ -1675,9 +1687,6 @@
     <Compile Include="src\timers.h">
       <SubType>compile</SubType>
     </Compile>
-    <None Include="src\ASF\sam0\drivers\sercom\i2c\i2c_master_interrupt.h">
-      <SubType>compile</SubType>
-    </None>
     <None Include="src\ASF\sam0\drivers\extint\extint.h">
       <SubType>compile</SubType>
     </None>
@@ -1720,33 +1729,12 @@
     <Compile Include="src\ASF\sam0\drivers\extint\extint_sam_l_c\extint.c">
       <SubType>compile</SubType>
     </Compile>
-    <None Include="src\ASF\sam0\drivers\rtc\rtc_count.h">
-      <SubType>compile</SubType>
-    </None>
-    <None Include="src\ASF\sam0\drivers\rtc\rtc_count_interrupt.h">
-      <SubType>compile</SubType>
-    </None>
-    <None Include="src\ASF\sam0\drivers\rtc\rtc_tamper.h">
-      <SubType>compile</SubType>
-    </None>
-    <Compile Include="src\ASF\sam0\drivers\rtc\rtc_sam_l_c\rtc_count.c">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="src\ASF\sam0\drivers\rtc\rtc_sam_l_c\rtc_count_interrupt.c">
-      <SubType>compile</SubType>
-    </Compile>
     <Compile Include="src\ASF\sam0\drivers\sercom\i2c\i2c_sam0\i2c_master.c">
       <SubType>compile</SubType>
     </Compile>
     <None Include="src\ASF\sam0\drivers\sercom\sercom_interrupt.h">
       <SubType>compile</SubType>
     </None>
-    <None Include="src\ASF\sam0\drivers\sercom\i2c\quick_start_master_callback\qs_i2c_master_callback.h">
-      <SubType>compile</SubType>
-    </None>
-    <Compile Include="src\ASF\sam0\drivers\sercom\i2c\i2c_sam0\i2c_master_interrupt.c">
-      <SubType>compile</SubType>
-    </Compile>
     <Compile Include="src\ASF\sam0\drivers\sercom\sercom_interrupt.c">
       <SubType>compile</SubType>
     </Compile>
@@ -1763,9 +1751,6 @@
       <SubType>compile</SubType>
     </None>
     <None Include="src\config\conf_extint.h">
-      <SubType>compile</SubType>
-    </None>
-    <None Include="src\config\conf_rtc.h">
       <SubType>compile</SubType>
     </None>
     <None Include="src\ASF\sam0\drivers\tc\tc.h">

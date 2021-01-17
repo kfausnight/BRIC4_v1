@@ -28,7 +28,7 @@ void cal_resetGroup(void){
 
 void removeGroup(float XYZ[NBUFF][3], uint32_t group){
 	uint32_t indStart, ind1, ind2;
-	uint32_t i, k;
+	uint32_t k;
 	
 	indStart = (group-1)*GROUP_SIZE;
 
@@ -60,27 +60,35 @@ uint32_t cal_removeGroup(bool *logRemove, uint32_t groupsStart){
 	
 }
 
-void cal_findBadGroup(float errArr1[], float errArr2[], uint32_t *badGroup, float *badGroupDelta){
+uint8_t cal_findBadGroup(float errArr1[], float errArr2[], uint32_t *badGroup, float *badGroupDelta){
 	//  Find worst group in both arrays
 	//  Assumes index 0 is baseline
+	//  Return source of worst group, Arr1 or Arr2
 	float tempWorst;
 	float dTemp1, dTemp2;	
 	uint32_t grp;
+	
+	uint8_t temp_errSource = 0;
+	uint8_t errSource = 0;
 	
 	for (grp=1;grp<=cal_report.groupsAll;grp++){
 		dTemp1 = errArr1[0]-errArr1[grp];
 		dTemp2 = errArr2[0]-errArr2[grp];
 		if (dTemp1>dTemp2){
 			tempWorst = dTemp1;
+			temp_errSource = 1;
 		}else{
 			tempWorst = dTemp2;
+			temp_errSource = 2;
 		}
 		if (tempWorst>*badGroupDelta){
 			*badGroupDelta = tempWorst;
 			*badGroup = grp;
+			errSource = temp_errSource;
 		}
 
 	}
+	return errSource;
 
 
 }
@@ -97,6 +105,7 @@ void cal_init(void){
 	
 	for (k=0;k<SHOT_SIZE;k++){
 		dist_raw_buf[k] = 0;
+		dist_disp_buf[k] = 0;
 	}
 	
 	loop_distance = 0;
@@ -121,8 +130,10 @@ void cal_done(enum CALTYPE caltype){
 			cal_report.pointsAll = nGroups*GROUP_SIZE;;
 			cal_report.groups = nGroups;
 			cal_report.groupsAll = nGroups;
-			get_time();//  Get current time
+			get_time();//  Get current time and temp
 			memcpy(&cal_report.time_inc_azm,&current_time,sizeof(current_time));
+			memcpy(&cal_report.time_quick_azm,&current_time,sizeof(current_time));
+			cal_report.tempC_inc_azm = currentTempC;
 			save_cal_report();
 			break;
 		case azm_quick:
@@ -132,11 +143,17 @@ void cal_done(enum CALTYPE caltype){
 			cal_report.pointsAll = nPoints;
 			get_time();//  Get current time
 			memcpy(&cal_report.time_quick_azm,&current_time,sizeof(current_time));
+			cal_report.tempC_quick_azm = currentTempC;
 			save_cal_report();
 			break;
 		case rangeFinder:
 			// Process Calibration data
-			cal_dist_process();
+			dist_calst.dist_offset = temp_dist_offset;
+			
+			//  Fill Out data for report structure
+			get_time();//  Get current time
+			memcpy(&cal_report.time_rangeFinder,&current_time,sizeof(current_time));
+			cal_report.tempC_rangeFinder = currentTempC;
 			//  Save data to EEPROM
 			save_calibration();
 			//  Add cal history entry
@@ -162,7 +179,7 @@ void cal_apply_cal_all(void){
 }
 
 void cal_full_inc_azm_process(uint8_t nLoops){
-	uint32_t i, k, loop;
+	uint32_t loop;
 	
 	// Start with empty cal structures
 	cal_init_struct(&a1_calst);
@@ -345,7 +362,7 @@ void cal_azm_quick_process(void){
 
 
 
-void cal_loop_test(struct MEASUREMENT *meas_inst){
+void cal_loop_test(struct MEASUREMENT_FULL *meas_inst){
 	float N1, E1, D1;
 	float dN1, dE1, dD1;
 	float delta_horizontal;
@@ -353,16 +370,16 @@ void cal_loop_test(struct MEASUREMENT *meas_inst){
 	
 	// increment distance and point counter
 	nPoints = nPoints+1;
-	loop_distance = loop_distance + meas_inst->distCal;
+	loop_distance = loop_distance + meas_inst->distMeters;
 	// find current position
 	N1 = loop_horizontal*cos(DEG2RAD*loop_azimuth);
 	E1 = loop_horizontal*sin(DEG2RAD*loop_azimuth);
 	D1 = loop_vertical;
 	// find difference in position
-	delta_horizontal = meas_inst->distCal*cos(DEG2RAD*meas_inst->inclination);
+	delta_horizontal = meas_inst->distMeters*cos(DEG2RAD*meas_inst->inclination);
 	dN1 = delta_horizontal*cos(DEG2RAD*meas_inst->azimuth);
 	dE1 = delta_horizontal*sin(DEG2RAD*meas_inst->azimuth);
-	dD1 = meas_inst->distCal*sin(DEG2RAD*meas_inst->inclination);
+	dD1 = meas_inst->distMeters*sin(DEG2RAD*meas_inst->inclination);
 	//  add  new offsets
 	N1 = N1 + dN1;
 	E1 = E1 + dE1;
@@ -376,26 +393,22 @@ void cal_loop_test(struct MEASUREMENT *meas_inst){
 	
 }
 
-void cal_dist_process(void){
-	
-	dist_calst.dist_offset = temp_dist_offset;
-	
-	//  Fill Out data for report structure
-	get_time();//  Get current time
-	memcpy(&cal_report.time_rangeFinder,&current_time,sizeof(current_time));
-	
-	
-}
 
-void cal_add_dist(struct MEASUREMENT *meas_inst){
+void cal_add_dist(struct MEASUREMENT_FULL *meas_inst){
 	float avg_raw;
 	uint8_t k;
 	
+	if(ind_buf>=SHOT_SIZE){
+		//  Bump everything down 1 slot
+		for(k=0;k<(SHOT_SIZE-1);k++){
+			dist_raw_buf[k] = dist_raw_buf[k+1];
+		}
+		ind_buf--;
+	}
 	dist_raw_buf[ind_buf] = meas_inst->distRaw;
-	ind_buf = ind_buf+1;
-	if (ind_buf>=SHOT_SIZE){ind_buf = 0;}
+	ind_buf++;
 	
-	avg_raw = meanArr(dist_raw_buf, SHOT_SIZE);
+	avg_raw = meanArr(dist_raw_buf, ind_buf);
 	
 	// temp_dist_offset always in meters
 	if (options.current_unit_dist == feet){
@@ -408,7 +421,7 @@ void cal_add_dist(struct MEASUREMENT *meas_inst){
 	
 	
 	//  Fill in values to display
-	for (k=0;k<SHOT_SIZE;k++){
+	for (k=0;k<ind_buf;k++){
 		if (options.current_unit_dist == feet){
 			dist_disp_buf[k] = dist_raw_buf[k]+temp_dist_offset*MT2FT;
 		}else{
@@ -428,7 +441,7 @@ void cal_add_dist(struct MEASUREMENT *meas_inst){
 
 void cal_inc_azm_eval(void){
 	uint32_t i, p, g, k, ind1;
-	struct MEASUREMENT temp_meas;
+	struct MEASUREMENT_FULL temp_meas;
 	uint8_t wrap_around;
 	float inc_group[4];
 	float azm_group[4];
@@ -524,14 +537,12 @@ void cal_inc_azm_eval(void){
 	
 }
 
-void cal_add_datapoint(struct MEASUREMENT *meas_inst){
-	//static float a1buf[GROUP_SIZE][3], a2buf[GROUP_SIZE][3];
-	//static float m1buf[GROUP_SIZE][3], m2buf[GROUP_SIZE][3];
+void cal_add_datapoint(struct MEASUREMENT_FULL *meas_inst){
 	static float aX_ang_ref, mX_ang_ref;
 	float aX_ang, mX_ang, foo;
 	float aDelta, mDelta;
 	float aXYZ[3], mXYZ[3];
-	uint8_t j, k;
+	uint8_t j;
 	uint32_t ind_stack;
 	
 	
@@ -699,7 +710,7 @@ void cal_angleYZ(float XYZ[][3], struct INST_CAL *cal_struct){
 	float roll_ang[NBUFF];
 	float x_ang_shift[NBUFF];
 	uint8_t ind, i, j, k, np;
-	float x_ang_comp, group_avg;
+	float group_avg;
 
 	//  Variables for line fitting
 	float detX;

@@ -16,6 +16,8 @@
 
 
 //  EEPROM Memory Map 
+//  Maximum 0xFA00
+#define add_measTracker	0x0000
 #define add_options		0x0100
 #define add_a1_calst	0x0300
 #define add_a2_calst	0x0400
@@ -25,8 +27,10 @@
 #define add_cal_report	0x0800
 #define add_calRawData_full	0x1000
 #define add_calRawData_qazm	0x2500
-#define add_test		0xC000
 
+//  EEPROM Initialization Keys
+#define KEY_SETTINGS_INITIALIZED	0xC3
+#define KEY_MEASUREMENT_TRACKER		0xA1
 
 uint16_t EEPROM_get_address(enum CALTYPE caltype){
 	uint16_t tempAddr;
@@ -71,19 +75,39 @@ void EEPROM_loadCalRawData(enum CALTYPE caltype){
 }
 
 
-void load_user_settings(void){
+void load_sync_tracker(void){
+	//  Read options structure from EEPROM
+	EEPROM_read(add_measTracker, &bleSyncTracker, sizeof(bleSyncTracker));
 	
-	//  Load example options structure to find initialized key
-	struct OPTIONS tempOptions;
-	getDefaultOptions(&tempOptions);
+	if (bleSyncTracker.keyMeasTrackerInitialized != KEY_MEASUREMENT_TRACKER){
+		// Settings in EEPROM not initialized or are out of date
+		//  Reload default settings into 
+		initSyncTracker();
+		bleSyncTracker.keyMeasTrackerInitialized = KEY_MEASUREMENT_TRACKER;
+		
+		//  Save into EEPROM
+		save_sync_tracker();
+	}
+	
+}
+
+void save_sync_tracker(void){
+
+	// Save User Options
+	EEPROM_write(add_measTracker, &bleSyncTracker, sizeof(bleSyncTracker));
+	
+}
+
+void load_user_settings(void){
 	
 	//  Read options structure from EEPROM
 	EEPROM_read(add_options, &options, sizeof(options));
 	
-	if (options.Settings_Initialized_Key != tempOptions.Settings_Initialized_Key){
+	if (options.keySettingsInitialized != KEY_SETTINGS_INITIALIZED){
 		// Settings in EEPROM not initialized or are out of date
 		//  Reload default settings into 
 		getDefaultOptions(&options);
+		options.keySettingsInitialized = KEY_SETTINGS_INITIALIZED;
 		//  Save into EEPROM
 		save_user_settings();
 	}
@@ -156,8 +180,7 @@ void load_cal_report(void){
 
 
 
-void EEPROM_read(uint16_t data_address, uint8_t data_buf[], uint32_t bytes_to_read){
-	uint16_t timeout;
+void EEPROM_read(uint16_t data_address, char data_buf[], uint32_t bytes_to_read){
 	struct i2c_master_packet packet = {
 		.address     = EEPROM_add,
 		.data        = data_buf,
@@ -174,13 +197,11 @@ void EEPROM_read(uint16_t data_address, uint8_t data_buf[], uint32_t bytes_to_re
 	add_buf[1] = data_address & 0xff;//low byte
 	packet.data = add_buf;
 	packet.data_length=2;
-	timeout=0;
 	while (i2c_master_write_packet_wait(&i2c_master_instance, &packet) !=STATUS_OK) {
 	}
 	//  Send read request to eeprom chip
 	packet.data = data_buf;
 	packet.data_length=bytes_to_read;
-	timeout=0;
 	while (i2c_master_read_packet_wait(&i2c_master_instance, &packet) !=STATUS_OK) {
 		//if (timeout++ == limit) {   break;   }
 	}
@@ -190,8 +211,7 @@ void EEPROM_read(uint16_t data_address, uint8_t data_buf[], uint32_t bytes_to_re
 	
 }
 
-void EEPROM_write(uint16_t address_init, uint8_t data_buf[], uint32_t bytes_to_write){
-	enum status_code i2c_code;
+void EEPROM_write(uint16_t address_init, char data_buf[], uint32_t bytes_to_write){
 	uint32_t bytes_written;
 	uint16_t bytes_possible;
 	uint16_t bytes_packet;
@@ -200,7 +220,6 @@ void EEPROM_write(uint16_t address_init, uint8_t data_buf[], uint32_t bytes_to_w
 	uint16_t  i;
 
 	uint8_t send_buf[PAGE_SIZE+2];
-	uint16_t timeout;
 	
 	//  Packet template
 	struct i2c_master_packet packet;
@@ -236,9 +255,7 @@ void EEPROM_write(uint16_t address_init, uint8_t data_buf[], uint32_t bytes_to_w
 		}
 		
 		// Send Packet
-		timeout=0;
 		while (i2c_master_write_packet_wait(&i2c_master_instance, &packet) !=STATUS_OK) {
-			//if (timeout++ == 0xFFFF) {   break;   }
 		}
 		//  Increment Variables
 		bytes_written = bytes_written+bytes_packet;
@@ -249,22 +266,6 @@ void EEPROM_write(uint16_t address_init, uint8_t data_buf[], uint32_t bytes_to_w
 	
 }
 
-
-void EEPROM_test(void){
-	#define debugMax 1000
-	uint8_t debugArrIn[debugMax];
-	uint8_t debugArrOut[debugMax];
-	uint32_t di;
-	
-	for (di=0;di<debugMax;di++){
-		debugArrIn[di] = di;
-		debugArrOut[di] = 0;
-	}
-	EEPROM_write(add_test, debugArrIn, debugMax);
-	EEPROM_read(add_test, debugArrOut, debugMax);
-	
-	
-}
 
 
 

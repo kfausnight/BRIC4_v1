@@ -13,40 +13,41 @@
 
 
 //Common Constants:
-#define SOFTWARE_VERSION 4.0
+#define SOFTWARE_VERSION 5.5
+#define HARDWARE_VERSION "A"
 #define NL	0x0a  //  New Line ("\n")
 #define CR	0x0d   //  New Line ("\n")
 #define DEG2RAD		(PI/180)//0.0174532925 // (pi/180) degrees to radians
 #define MT2FT		3.28084 //  1 meter = 3.28084 feet
 #define RAD2DEG		(180/PI)//57.2957795  // (180/pi) radians to degrees
-#define MAX_ERRORS 4 //  Max number of error codes to store with each measurement
+#define MAX_ERRORS 2 //  Max number of error codes to store with each measurement
 #define SHOT_DELAY_MAX 5 //seconds, max setting
 #define MIN_ERROR_SENSITIVITY 0.2 // degrees; Error Checking Sensitivity
 #define MAX_ERROR_SENSITIVITY 3  // degrees; Error Checking Sensitivity
 #define STEP_ERROR_SENSITIVITY 0.2 // degrees; Error Checking Sensitivity
 #define DELTA_ANG_MIN		8 // degrees;  Threshold to register as new 4-point group.
-#define NBUFF_MEAS	6 //  Size of measurement buffer
+#define N_MEASBUF	10 //  Size of measurement buffer
 #define NBUFF		100//  Size of data buffers
 #define NGROUP		25 //  Max number of groups; should be NBUFF/GROUP_SIZE
 #define NBUFFQAZM	5//  Quick AZM Calibration Temporary Buffer Length
 #define QAZM_STDEV_MIN	0.005 // Quick AZM Calibration Stability Requirement Stdev
 #define GROUP_SIZE	4// For Azm/Inc calibration
 #define SHOT_SIZE   4// For Distance calibration
-#define MIN_GROUPS	9//const uint8_t min_groups = 9;// Minimum groups to complete a calibration
+#define MIN_GROUPS	14// Minimum groups to complete a calibration
 #define MAX_BAD_GROUPS	3 //  Maximum groups that can be eliminated in calibration routine.
-#define BAD_GROUP_THRESHOLD		0.5//  Degrees, will eliminate group if improvement greater than this
-#define DIST_CAL_SETPOINT_FT	3 //  Distance to set marker during distance calibration, feet
-#define DIST_CAL_SETPOINT_MT	1 // Distance to set marker during distance calibration, meters
+#define BAD_GROUP_THRESHOLD		0.4//  Degrees, will eliminate group if improvement greater than this
+#define DIST_CAL_SETPOINT_FT	3.0 //  Distance to set marker during distance calibration, feet
+#define DIST_CAL_SETPOINT_MT	1.0 // Distance to set marker during distance calibration, meters
+#define REF_INDEX_MAX			9999  // Maximum reference index, limited by display
 #define UART_BUFFER_LENGTH		100
-#define DEBUG_BUFFER_LENGTH	200
-//  Timing Definitions
-#define DEBOUNCE_MS	300		// ms.  No new button input within this interval
-#define DEBOUNCE_MS_QUICK3	300		// ms.  No new button input within this interval during turn-on with external button
-#define QUICK3_MS	3000	// ms.  Must press ext button 3 times in this interval
+#define DEBUG_BUFFER_LENGTH	100
+//  Timing Definitions	
+#define DEBOUNCE_MS 150		// ms.  No new button input within this interval
+#define QUICK3_MS	1000	// ms.  Must press ext button 3 times each within this interval
 #define OFF_HOLD_MS	3000  // ms. Hold down ext button for this long to shut off device
-#define IDLE_MAX_S 60 // seconds.  Produces input_powerdown after this many seconds
+#define IDLE_MAX_S 90 // seconds.  Produces input_powerdown after this many seconds
 #define LASER_TIMEOUT_S	30 // seconds.  Shuts down laser rangefinder if idle for this many seconds
-#define MEASUREMENT_TIMEOUT 5000 //  When taking a measurement, wait this long for laser data to arrive back
+#define MEASUREMENT_TIMEOUT 5000 //  Ms, When taking a measurement, wait this long for laser data to arrive back
 //  Clock Assignments
 #define GCLK_FOR_32khz				GCLK_GENERATOR_2
 #define GCLK_FOR_SPI				GCLK_GENERATOR_0
@@ -61,7 +62,7 @@
 enum CALTYPE{inc_azm_full, azm_quick, rangeFinder};
 
 
-
+enum MEAS_TYPE{measRegular, measScan, measQuick, measCal};
 
 
 struct BACKLIGHT_COLOR
@@ -80,17 +81,13 @@ struct BACKLIGHT_SETTING{
 
 
 struct TIME {
-	uint8_t	seconds;
-	uint8_t	minutes;
-	uint8_t	hours;
-	uint8_t day; //day of the week
-	uint8_t	date; //day of the month
+	uint16_t year;
 	uint8_t	month;
-	uint8_t year; // Last two digits only, i.e. "18" for 2018
-	uint8_t control;
-	uint8_t control_status;
-	float temperatureC;
-	float temperatureF;
+	uint8_t	day; //day of the month
+	uint8_t	hours;
+	uint8_t	minutes;
+	uint8_t	seconds;
+	uint8_t centiseconds;
 };
 
 enum MEAS_ERROR_TYPE{
@@ -124,12 +121,28 @@ typedef enum {
 } UNIT_TYPE;
 
 
-struct MEASUREMENT{
-	uint32_t index_ref;//
+
+struct MEASUREMENT_FULL{
+	uint32_t refIndex;//  Ref 0-REF_INDEX_MAX
 	uint32_t posix_time;//  POSIX time, number of seconds since Jan 1 1970
-	float temperature; // Temperature in celsius
-	float azimuth, inclination, roll, declination;// Processed readings
-	float distRaw, distCal;
+	struct TIME measTime;
+	float distMeters;  //  Distance in Meters
+	float azimuth;
+	float inclination;
+	float dip;
+	float roll;
+	float temperatureC; // Temperature in celsius
+	enum MEAS_TYPE meas_type;
+	uint16_t samples;
+	enum MEAS_ERROR_TYPE  errCode[2];
+	float measurement_error_data1[2];
+	float measurement_error_data2[2];
+	
+	//  Additional data
+	float distRaw;
+	
+	//  Time to take measurement
+	uint32_t readTimeMs;
 	float a1Raw[3];// raw data, accelerometer 1
 	float a2Raw[3];// raw data, accelerometer 2
 	float m1Raw[3];// raw data, compass 1
@@ -138,19 +151,46 @@ struct MEASUREMENT{
 	float a2Cal[3];// raw data, accelerometer 2
 	float m1Cal[3];// raw data, compass 1
 	float m2Cal[3];// raw data, compass 2
-	uint32_t samples;
-	UNIT_TYPE distance_units;
-	UNIT_TYPE temp_units;
-	//  Time to take measurement
-	uint32_t readTimeMs;
-	//  Measurement Error Data
-	uint32_t num_errors;
-	enum MEAS_ERROR_TYPE measurement_error[MAX_ERRORS];
-	float measurement_error_data1[MAX_ERRORS];
-	float measurement_error_data2[MAX_ERRORS];
+	
+
 	
 };
 
+
+struct MEASUREMENT{
+	uint32_t refIndex;//  Ref 0-REF_INDEX_MAX
+	uint32_t posix_time;//  POSIX time, number of seconds since Jan 1 1970
+	struct TIME measTime;
+	float distMeters;  //  Distance in Meters
+	float azimuth;
+	float inclination;
+	float dip;
+	float roll;
+	float temperatureC; // Temperature in celsius
+	enum MEAS_TYPE meas_type;
+	uint16_t samples;
+	enum MEAS_ERROR_TYPE  errCode[2];
+	float measurement_error_data1[2];
+	float measurement_error_data2[2];
+	
+};
+
+struct BLE_SYNC_TRACKER{
+	uint8_t keyMeasTrackerInitialized;
+	struct TIME timeEnd;
+	struct TIME timeSync;
+	uint32_t refIndexEnd;
+	uint32_t refIndexSync;
+	uint32_t measStackEnd;
+	uint32_t measStackSync;
+	
+	
+};
+
+// Measurement Display Data Buffers
+extern struct MEASUREMENT measBuf[N_MEASBUF];//  Circular buffer
+extern uint32_t measBufInd;
+extern uint32_t refIndex ;
 
 
 //  Global Variables
@@ -171,8 +211,10 @@ extern struct CAL_REPORT cal_report;
 
 
 //  Other global variables
+//  State machine variables
 extern volatile enum INPUT current_input, last_input; // Current and Last Inputs
-extern volatile enum STATE current_state; //  Current State
+extern volatile enum STATE current_state, last_state; //  Current State
+extern volatile bool state_change;
 
 extern struct OPTIONS options;
 //  SD Card variables
@@ -184,11 +226,20 @@ extern char write_str1[400];
 extern char write_str2[400];
 // Buffer to hold characters for display
 extern char display_str[200];
+//  Measurement Tracker
+extern struct BLE_SYNC_TRACKER bleSyncTracker;
 //  Time structures
-extern struct TIME current_time, temp_time;
+extern struct TIME current_time;
+//  Temperature
+extern float currentTempC;
 //  Status variables
 extern volatile bool isCharging;//  Variable to track when plugged in and charging
+extern volatile bool SD_WriteLockout;
 extern volatile bool buttonE_triggered; // Variable to track when external button is triggered
+extern char BleClientMAC[20];
+extern char BleDeviceMAC[20]; //  This device (BRIC4) MAC address
+extern char BleDeviceName[20]; // BRIC4 device name (e.g. "BRIC4_0039")
+extern char BleCommandQueue[20];//  Queued BLE command
 //  Debug
 extern uint32_t debug_ct1, debug_ct2;
 
@@ -200,6 +251,10 @@ extern volatile uint8_t rxBufferBleIndex;
 extern volatile char debugBuff[DEBUG_BUFFER_LENGTH];
 extern volatile uint32_t debugBuffIndex;
 extern char *debugBuffPtr;
+extern char *bleBuffPtr;
+extern volatile char laserDebugBuff[DEBUG_BUFFER_LENGTH];
+extern volatile uint32_t laserDebugBuffIndex;
+extern char *laserDebugBuffPtr;
 
 // Physical Pin Defines
 #define button1	IOPORT_CREATE_PIN(IOPORT_PORTB, 9)
@@ -224,18 +279,26 @@ extern char *debugBuffPtr;
 #define mag1_SS IOPORT_CREATE_PIN(IOPORT_PORTA, 21)//CS4
 #define mag2_SS IOPORT_CREATE_PIN(IOPORT_PORTA, 20)//CS3
 #define SD_CS	IOPORT_CREATE_PIN(IOPORT_PORTA, 15)//CS7
-#define BLE_COMMAND_MODE		IOPORT_CREATE_PIN(IOPORT_PORTA, 22)//CS5
 #define V2_enable	IOPORT_CREATE_PIN(IOPORT_PORTB, 2)
 #define laser_reset IOPORT_CREATE_PIN(IOPORT_PORTA, 2)
 #define LCD_SPI_SS_PIN   IOPORT_CREATE_PIN(IOPORT_PORTA, 23)//LCD SS
 #define LCD_SPI_DC_PIN   IOPORT_CREATE_PIN(IOPORT_PORTA, 27)//LCD A0
 #define LCD_SPI_RST_PIN  IOPORT_CREATE_PIN(IOPORT_PORTB, 23)//LCD RST
-#define BLE_ota  IOPORT_CREATE_PIN(IOPORT_PORTB, 22)//BL OTA
-#define BLE_autorun	IOPORT_CREATE_PIN(IOPORT_PORTA, 14)//BL Auto Run
-#define BLE_reset	IOPORT_CREATE_PIN(IOPORT_PORTA, 3)
+//  Pin to indicate outgoing data
+#define BLE_rcvMode_pin	 IOPORT_CREATE_PIN(IOPORT_PORTA, 22)//CS5
+//  Auto-Run pin.  Low enables auto-run of downloaded applications.
+#define BLE_nAUTORUN_pin	IOPORT_CREATE_PIN(IOPORT_PORTA, 14)//BL Auto Run
+//  BL652 Over The Air Enable 
+//  High enables OTA downloads
+#define BLE_OTA_sendMode_pin  IOPORT_CREATE_PIN(IOPORT_PORTB, 22)//BL OTA
+//  BL652 Reset Pin
+//  Low holds in reset, high is run mode
+#define BLE_nRESET_pin	IOPORT_CREATE_PIN(IOPORT_PORTA, 3)
+#define BuzzerPin		IOPORT_CREATE_PIN(IOPORT_PORTB, 3)
 
 
 struct OPTIONS{
+	uint8_t keySettingsInitialized;
 	uint32_t SerialNumber;
 	UNIT_TYPE current_unit_dist;
 	UNIT_TYPE current_unit_temp;
@@ -244,58 +307,50 @@ struct OPTIONS{
 	float errorSensitivity;
 
 	struct BACKLIGHT_SETTING backlight_setting;
-	uint8_t Settings_Initialized_Key;
+	
 };
 
 
 
-
+#define N_GENERIC_INPUTS 6
 // Inputs
 enum INPUT {
-	input_none,
+	//  Generic	
+	//  Must be first 6
 	input_button1,
 	input_button2,
 	input_button3,
 	input_button4,
 	input_buttonE,
-	input_powerdown,
-	input_1sec,
-	input_state_complete,
-	input_set_clock,
-	input_set_bluetooth,
-	input_set_units,
-	input_error_info,
-	input_cal_menu,
-	input_dist_calibration,
-	input_inc_azm_full_calibration,
-	input_disp_cal_report,
-	input_azm_quick_calibration,
-	input_loop_test,
-	input_debug_rawData,
-	input_debug_backlight,
-	input_debug_charger,
-	input_wakeup,
-	input_laser_timeout,
-	input_menu_debug,
-	input_usb_transaction,
-	input_reprocess_inc_azm_cal,
-	input_reprocess_azm_quick_cal,
-	input_BLE_message,
+	input_pwrDown,
 	
+	//  Background Inputs	
+	input_none,
+	input_1sec,
+	input_BLE_message,
+	input_BLE_command,
+	input_usb_transaction,
+	
+	//  Time related
+	input_laser_timeout,
+	input_state_complete,
+
 };
 
 // States
 enum STATE{
-	st_aim,
-	st_measure,
+	st_NULL,//  Must be first
+	//st_aim,
+	//st_measure,
+	st_scan,
 	st_main_display,
 	st_menu1,
 	st_powerdown,
 	st_powerup,
 	st_set_clock,
-	st_set_bluetooth,
+	st_menu_BLE,
 	st_set_options,
-	st_aim_abort,
+	//st_aim_abort,
 	st_menu_cal,
 	st_inc_azm_full_calibration,
 	st_azm_quick_calibration,
@@ -310,7 +365,9 @@ enum STATE{
 	st_debug_charger,
 	st_error_info,
 	st_menu_debug,
-	st_usb_process
+	st_usb_process,
+	st_debug_BLE,
+	st_firmware,
 };
 
 
@@ -331,9 +388,10 @@ enum STATE{
 #include <dispFunctions.h>
 #include <mathBRIC.h>
 #include <SDcardBRIC.h>
-
+#include <Buzzer.h>
+#include <errorsBRIC4.h>
 #include <EEPROM.h>
-
+#include <buttons.h>
 
 #include <batteryManagement.h>
 #include "glcd\glcd.h"
@@ -363,10 +421,12 @@ enum STATE{
 void fn_main_display(void);
 void fn_aim(void);
 void fn_measure(void);
+void fn_scan(void);
 void fn_powerdown(void);
 void fn_powerup(void);
 void fn_set_clock(void);
-void fn_set_bluetooth(void);
+void fn_menu_BLE(void);
+void fn_debug_BLE(void);
 void fn_set_options(void);
 void fn_menu1(void);
 void fn_menu_cal(void);
@@ -385,16 +445,15 @@ void fn_debug_backlight(void);
 void fn_debug_charger(void);
 void fn_error_info(void);
 void fn_usb_process(void);
+void fn_firmware(void);
 // Other functions
-void print_data_screen(void);
 void input_handler(void);
 void config_pins_powerup(void);
 void config_pins_powerdown(void);
 void cal_disp_message(void);
 void getDefaultOptions(struct OPTIONS *);
-enum INPUT externalButtonRoutine(bool, uint32_t);
-
-
+void processMeasurement(struct MEASUREMENT_FULL *);
+void UsbHandleTransactions(void);
 //USB
 
 

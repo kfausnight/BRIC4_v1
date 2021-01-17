@@ -12,12 +12,14 @@
 #include <main.h>
 
 
-void EEPROM_read(uint16_t , uint8_t *, uint32_t);
+void EEPROM_read(uint16_t , char *, uint32_t);
 
-void EEPROM_write(uint16_t , uint8_t *, uint32_t);
+void EEPROM_write(uint16_t , char *, uint32_t);
+
+void load_sync_tracker(void);
+void save_sync_tracker(void);
 
 void load_user_settings(void);
-
 void save_user_settings(void);
 
 void load_calibration(void);
@@ -31,8 +33,6 @@ void EEPROM_loadCalRawData(enum CALTYPE);
 void save_cal_report(void);
 
 void load_cal_report(void);
-
-void EEPROM_test(void);
 
 
 

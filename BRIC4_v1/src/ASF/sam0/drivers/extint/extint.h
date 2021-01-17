@@ -332,6 +332,8 @@ struct extint_nmi_conf {
 #endif
 };
 
+
+
 #if EXTINT_CALLBACK_MODE == true
 /** Type definition for an EXTINT module callback function */
 typedef void (*extint_callback_t)(void);
@@ -381,6 +383,21 @@ static inline Eic * _extint_get_eic_from_channel(
 		return NULL;
 	}
 }
+
+//  Added Kfausnight 20210114
+static inline bool extint_is_syncing(void)
+{
+	Eic *const eics[EIC_INST_NUM] = EIC_INSTS;
+
+	for (uint32_t i = 0; i < EIC_INST_NUM; i++) {
+		if((eics[i]->SYNCBUSY.reg & EIC_SYNCBUSY_ENABLE)
+		|| (eics[i]->SYNCBUSY.reg & EIC_SYNCBUSY_SWRST)){
+			return true;
+		}
+	}
+	return false;
+}
+
 
 /**
  * \brief Retrieves the base EIC module address from a given NMI channel number.

@@ -1,4 +1,7 @@
 src/mathBRIC.d src/mathBRIC.o: ../src/mathBRIC.c ../src/mathBRIC.h \
+ ../src/asf.h ../src/ASF/sam0/utils/compiler.h \
+ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\lib\gcc\arm-none-eabi\6.3.1\include\stddef.h \
+ ../src/ASF/common/utils/parts.h ../src/ASF/sam0/utils/status_codes.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\lib\gcc\arm-none-eabi\6.3.1\include\stdint.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\stdint.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\machine\_default_types.h \
@@ -6,21 +9,6 @@ src/mathBRIC.d src/mathBRIC.o: ../src/mathBRIC.c ../src/mathBRIC.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\_newlib_version.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\_intsup.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\_stdint.h \
- c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\math.h \
- c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\reent.h \
- c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\_ansi.h \
- c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\newlib.h \
- c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\config.h \
- c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\machine\ieeefp.h \
- c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\lib\gcc\arm-none-eabi\6.3.1\include\stddef.h \
- c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\_types.h \
- c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\machine\_types.h \
- c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\lock.h \
- c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\cdefs.h \
- c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\_ansi.h \
- ../src/calibration.h ../src/timers.h ../src/asf.h \
- ../src/ASF/sam0/utils/compiler.h ../src/ASF/common/utils/parts.h \
- ../src/ASF/sam0/utils/status_codes.h \
  ../src/ASF/sam0/utils/preprocessor/preprocessor.h \
  ../src/ASF/sam0/utils/preprocessor/tpaste.h \
  ../src/ASF/sam0/utils/preprocessor/stringz.h \
@@ -105,7 +93,17 @@ src/mathBRIC.d src/mathBRIC.o: ../src/mathBRIC.c ../src/mathBRIC.h \
  ../src/ASF/sam0/utils/cmsis/saml21/include_b/instance/wdt.h \
  ../src/ASF/sam0/utils/cmsis/saml21/include_b/pio/saml21g18b.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\stdio.h \
+ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\_ansi.h \
+ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\newlib.h \
+ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\config.h \
+ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\machine\ieeefp.h \
+ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\cdefs.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\lib\gcc\arm-none-eabi\6.3.1\include\stdarg.h \
+ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\reent.h \
+ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\_ansi.h \
+ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\_types.h \
+ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\machine\_types.h \
+ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\lock.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\types.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\machine\endian.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\machine\_endian.h \
@@ -145,12 +143,6 @@ src/mathBRIC.d src/mathBRIC.o: ../src/mathBRIC.c ../src/mathBRIC.h \
  ../src/ASF/common/services/storage/ctrl_access/ctrl_access.h \
  ../src/config/conf_access.h ../src/comms\sd_mmc_mem.h \
  ../src/ASF/sam0/drivers/port/port.h \
- ../src/ASF/sam0/drivers/rtc/rtc_count.h ../src/config/conf_clocks.h \
- ../src/ASF/sam0/drivers/system/interrupt/system_interrupt.h \
- ../src/ASF/sam0/drivers/system/interrupt/system_interrupt_saml21/system_interrupt_features.h \
- ../src/ASF/sam0/drivers/rtc/rtc_count_interrupt.h \
- ../src/ASF/sam0/drivers/rtc/rtc_count.h \
- ../src/ASF/sam0/drivers/rtc/rtc_tamper.h \
  ../src/ASF/sam0/drivers/usb/stack_interface/usb_dual.h \
  ../src/ASF/common2/components/memory/sd_mmc/sd_mmc.h \
  ../src/config/conf_sd_mmc.h ../src/clockSetup.h ../src/main.h \
@@ -159,9 +151,11 @@ src/mathBRIC.d src/mathBRIC.o: ../src/mathBRIC.c ../src/mathBRIC.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\string.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\xlocale.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\string.h \
- ../src/BLE_func.h ../src/comms/comms.h ../src/sensors.h \
- ../src/backlight.h ../src/dispFunctions.h ../src/SDcardBRIC.h \
- ../src/EEPROM.h ../src/batteryManagement.h ../src/glcd\glcd.h \
+ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\math.h \
+ ../src/timers.h ../src/BLE_func.h ../src/comms/comms.h ../src/sensors.h \
+ ../src/calibration.h ../src/backlight.h ../src/dispFunctions.h \
+ ../src/SDcardBRIC.h ../src/Buzzer.h ../src/errorsBRIC4.h ../src/EEPROM.h \
+ ../src/buttons.h ../src/batteryManagement.h ../src/glcd\glcd.h \
  ../src/glcd\ATSAML21.h ../src/comms\comms.h ../src/glcd\ATSAML21.h \
  ../src/glcd\ST7565R.h ../src/glcd\glcd_graphics.h \
  ../src/glcd\glcd_text_tiny.h ../src/glcd\glcd_text.h \
@@ -170,14 +164,14 @@ src/mathBRIC.d src/mathBRIC.o: ../src/mathBRIC.c ../src/mathBRIC.h \
  ../src/ASF/sam0/drivers/system/system.h \
  ../src/ASF/sam0/drivers/system/power/power_sam_l/power.h \
  ../src/ASF/sam0/drivers/system/reset/reset_sam_l/reset.h \
+ ../src/ASF/sam0/drivers/system/interrupt/system_interrupt.h \
+ ../src/ASF/sam0/drivers/system/interrupt/system_interrupt_saml21/system_interrupt_features.h \
  ../src/ASF/sam0/drivers/sercom/sercom_pinout.h \
  ../src/ASF/sam0/drivers/sercom/sercom_interrupt.h \
  ../src/ASF/sam0/drivers/sercom/sercom.h \
  ../src/ASF/sam0/drivers/sercom/i2c/i2c_common.h \
  ../src/ASF/sam0/drivers/sercom/i2c/i2c_master.h \
  ../src/ASF/sam0/drivers/sercom/i2c/i2c_common.h \
- ../src/ASF/sam0/drivers/sercom/i2c/i2c_master_interrupt.h \
- ../src/ASF/sam0/drivers/sercom/i2c/i2c_master.h \
  ../src/ASF/sam0/drivers/sercom/spi/spi.h ../src/config/conf_spi.h \
  ../src/ASF/sam0/drivers/sercom/usart/usart.h \
  ../src/ASF/sam0/drivers/sercom/usart/usart_interrupt.h \
@@ -210,6 +204,16 @@ src/mathBRIC.d src/mathBRIC.o: ../src/mathBRIC.c ../src/mathBRIC.h \
 
 ../src/mathBRIC.h:
 
+../src/asf.h:
+
+../src/ASF/sam0/utils/compiler.h:
+
+c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\lib\gcc\arm-none-eabi\6.3.1\include\stddef.h:
+
+../src/ASF/common/utils/parts.h:
+
+../src/ASF/sam0/utils/status_codes.h:
+
 c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\lib\gcc\arm-none-eabi\6.3.1\include\stdint.h:
 
 c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\stdint.h:
@@ -223,42 +227,6 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-no
 c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\_intsup.h:
 
 c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\_stdint.h:
-
-c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\math.h:
-
-c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\reent.h:
-
-c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\_ansi.h:
-
-c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\newlib.h:
-
-c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\config.h:
-
-c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\machine\ieeefp.h:
-
-c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\lib\gcc\arm-none-eabi\6.3.1\include\stddef.h:
-
-c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\_types.h:
-
-c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\machine\_types.h:
-
-c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\lock.h:
-
-c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\cdefs.h:
-
-c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\_ansi.h:
-
-../src/calibration.h:
-
-../src/timers.h:
-
-../src/asf.h:
-
-../src/ASF/sam0/utils/compiler.h:
-
-../src/ASF/common/utils/parts.h:
-
-../src/ASF/sam0/utils/status_codes.h:
 
 ../src/ASF/sam0/utils/preprocessor/preprocessor.h:
 
@@ -428,7 +396,27 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\lib\gc
 
 c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\stdio.h:
 
+c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\_ansi.h:
+
+c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\newlib.h:
+
+c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\config.h:
+
+c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\machine\ieeefp.h:
+
+c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\cdefs.h:
+
 c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\lib\gcc\arm-none-eabi\6.3.1\include\stdarg.h:
+
+c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\reent.h:
+
+c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\_ansi.h:
+
+c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\_types.h:
+
+c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\machine\_types.h:
+
+c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\lock.h:
 
 c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\types.h:
 
@@ -512,20 +500,6 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-no
 
 ../src/ASF/sam0/drivers/port/port.h:
 
-../src/ASF/sam0/drivers/rtc/rtc_count.h:
-
-../src/config/conf_clocks.h:
-
-../src/ASF/sam0/drivers/system/interrupt/system_interrupt.h:
-
-../src/ASF/sam0/drivers/system/interrupt/system_interrupt_saml21/system_interrupt_features.h:
-
-../src/ASF/sam0/drivers/rtc/rtc_count_interrupt.h:
-
-../src/ASF/sam0/drivers/rtc/rtc_count.h:
-
-../src/ASF/sam0/drivers/rtc/rtc_tamper.h:
-
 ../src/ASF/sam0/drivers/usb/stack_interface/usb_dual.h:
 
 ../src/ASF/common2/components/memory/sd_mmc/sd_mmc.h:
@@ -546,11 +520,17 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-no
 
 c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\string.h:
 
+c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\math.h:
+
+../src/timers.h:
+
 ../src/BLE_func.h:
 
 ../src/comms/comms.h:
 
 ../src/sensors.h:
+
+../src/calibration.h:
 
 ../src/backlight.h:
 
@@ -558,7 +538,13 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-no
 
 ../src/SDcardBRIC.h:
 
+../src/Buzzer.h:
+
+../src/errorsBRIC4.h:
+
 ../src/EEPROM.h:
+
+../src/buttons.h:
 
 ../src/batteryManagement.h:
 
@@ -590,6 +576,10 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-no
 
 ../src/ASF/sam0/drivers/system/reset/reset_sam_l/reset.h:
 
+../src/ASF/sam0/drivers/system/interrupt/system_interrupt.h:
+
+../src/ASF/sam0/drivers/system/interrupt/system_interrupt_saml21/system_interrupt_features.h:
+
 ../src/ASF/sam0/drivers/sercom/sercom_pinout.h:
 
 ../src/ASF/sam0/drivers/sercom/sercom_interrupt.h:
@@ -601,10 +591,6 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-no
 ../src/ASF/sam0/drivers/sercom/i2c/i2c_master.h:
 
 ../src/ASF/sam0/drivers/sercom/i2c/i2c_common.h:
-
-../src/ASF/sam0/drivers/sercom/i2c/i2c_master_interrupt.h:
-
-../src/ASF/sam0/drivers/sercom/i2c/i2c_master.h:
 
 ../src/ASF/sam0/drivers/sercom/spi/spi.h:
 

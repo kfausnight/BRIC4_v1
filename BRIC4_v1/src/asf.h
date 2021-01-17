@@ -91,9 +91,9 @@
 #include <parts.h>
 
 // From module: RTC - Real Time Counter in Count Mode (Callback APIs)
-#include <rtc_count.h>
-#include <rtc_count_interrupt.h>
-#include <rtc_tamper.h>
+//#include <rtc_count.h>
+//#include <rtc_count_interrupt.h>
+//#include <rtc_tamper.h>
 
 // From module: SAM D21/R21/D11/L21/DA1/L22 USB Dual role interface
 #include <usb_dual.h>
@@ -105,10 +105,9 @@
 #include <sercom.h>
 #include <sercom_interrupt.h>
 
-// From module: SERCOM I2C - Master Mode I2C (Callback APIs)
+// From module: SERCOM I2C - Master Mode I2C (Polled APIs)
 #include <i2c_common.h>
 #include <i2c_master.h>
-#include <i2c_master_interrupt.h>
 
 // From module: SERCOM Polled API
 #include <sercom.h>

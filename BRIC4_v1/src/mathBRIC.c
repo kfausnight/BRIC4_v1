@@ -7,8 +7,31 @@
 
 #include <mathBRIC.h>
 
+void circBuffInc(uint32_t *index, uint32_t size){
+	*index = *index+1;
+	if(*index>=size){
+		*index = 0;
+	}
+}
+void circBuffDec(uint32_t *index, uint32_t size){
+	if(*index==0){
+		*index = size-1;
+		}else{
+		*index = *index-1;
+	}
 
-void calc_orientation(struct MEASUREMENT *meas_inst){
+}
+
+void copyMeasurement(struct MEASUREMENT *meas, struct MEASUREMENT_FULL *meas_full ){
+	//  Copy measurement from full structure to summarized structure
+	
+	memcpy(meas, meas_full, sizeof(*meas));
+	
+}
+	
+
+
+void calc_orientation(struct MEASUREMENT_FULL *meas_inst){
 	uint8_t i;
 	float aXYZ[3], cXYZ[3];
 	
@@ -21,7 +44,7 @@ void calc_orientation(struct MEASUREMENT *meas_inst){
 	//  Calculate Aximuth, Inclination, and Roll
 	calc_azm_inc_roll_dec(aXYZ, cXYZ,
 	&meas_inst->azimuth,		&meas_inst->inclination,
-	&meas_inst->roll,		&meas_inst->declination);
+	&meas_inst->roll,		&meas_inst->dip);
 	
 	
 }
@@ -30,7 +53,7 @@ void calc_orientation(struct MEASUREMENT *meas_inst){
 
 
 
-void calc_azm_inc_roll_dec(float aXYZ[3], float cXYZ[3], float *azimuthP, float *inclinationP, float *rollP, float *declinationP){
+void calc_azm_inc_roll_dec(float aXYZ[3], float cXYZ[3], float *azimuthP, float *inclinationP, float *rollP, float *dipP){
 	
 	float crotXYZ[3];
 	float thetaX, thetaY, crxy;
@@ -53,11 +76,17 @@ void calc_azm_inc_roll_dec(float aXYZ[3], float cXYZ[3], float *azimuthP, float 
 		*azimuthP = *azimuthP+360;
 	}
 	
-	//  Calculate declination
+	//  Calculate Magnetic Dip
 	crxy= sqrt(pow(crotXYZ[0],2)+pow(crotXYZ[1],2));
-	*declinationP = RAD2DEG*atan2(crotXYZ[2], crxy);
+	*dipP = RAD2DEG*atan2(crotXYZ[2], crxy);
 	
 	
+}
+
+float calc_magnitude(float xyz[3]){
+	float magnitude;
+	magnitude = sqrt(pow(xyz[0],2)+pow(xyz[1],2)+pow(xyz[2],2));
+	return magnitude;
 }
 
 float calc_mag_stdev(float XYZ[NBUFF][3]){
@@ -323,6 +352,9 @@ float determinant(float a[6][6], uint8_t k)
 }
 
 
-
+float celsius2fahrenheit(float dataCelsius){
+	
+	return (dataCelsius*9/5+32);
+}
 
 

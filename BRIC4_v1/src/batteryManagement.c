@@ -25,6 +25,26 @@ uint16_t HibCFG;
 float battVoltage;
 
 
+void BleUpdateBattLevel(void){
+	if (current_state==st_powerdown){
+		return;
+	}
+	uint8_t retBatt, currBatt;
+	
+	retBatt = BLE_getBatteryLevel();
+	
+
+	//retBatt = write_str2[0]*16+write_str2[1];
+	
+	currBatt = getBatteryLevel();
+	
+	if (retBatt!=currBatt){
+		BLE_setBatteryLevel(currBatt);
+		
+	}
+	
+	
+}
 
 
 void setup_batt(void){
@@ -91,6 +111,26 @@ uint16_t getBatteryLevel(void){
 	return batt_SOC;
 }
 
+
+void setupCharger(void){
+	uint8_t temp;
+	
+	//  Set Termination Voltage
+	temp = 0x8C;
+	adp5062_reg_read_write(writep, 0x03, &temp);
+	
+	//  Set Charge Limit
+	temp = 0x3A;
+	adp5062_reg_read_write(writep, 0x04, &temp);
+	
+	//  Set Timer limits
+	temp = 0x28;
+	adp5062_reg_read_write(writep, 0x06, &temp);
+	
+	//  Set USB input current limit
+	setChargeCurrent(options.chargeCurrent);
+	
+}
 
 void setChargeCurrent(uint32_t chargeCurrent){
 	// ILIM is lower 3 bits of addr 0x02

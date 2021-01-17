@@ -83,26 +83,31 @@ enum LASER_MESSAGE_TYPE{
 };
 
 
-enum LASER_MESSAGE_TYPE laserMessageType(void);
-struct usart_module usart_laser;
+//  BLE module functions and structures
 struct usart_module usart_BLE;
-enum status_code writeLaser(uint8_t *tx_data,uint16_t length);
-enum status_code writeBle(uint8_t *tx_data,uint16_t length);
-void readLaserCallback(struct usart_module *const usart_module);
-void writeLaserCallback(struct usart_module *const usart_module);
+void configure_usart_BLE(void);
+enum status_code BLE_send_parse_CMD(char , char *, uint8_t,char *, char *, uint8_t *, uint16_t);
+enum status_code BLE_send_message(char , char *, uint8_t);
+enum status_code BLE_read_message(char *, char *, uint8_t *, uint16_t);
+enum status_code writeBleWait(char *tx_data,uint16_t length);
 void readBleCallback(struct usart_module *const usart_module);
 void writeBleCallback(struct usart_module *const usart_module);
-void configure_usart_Laser(void);
-void configure_usart_BLE(void);
+void rxBufferBleClear(void);
 void BLE_usart_isolate(void);
 bool isBleCommEnabled(void);
-bool isLaserTransmitComplete(void);
-bool isLaserReceiveComplete(void);
 bool isBleTransmitComplete(void);
 bool isBleReceiveComplete(void);
-void rxBufferLaserClear(void);
-void rxBufferBleClear(void);
 
+//   Laser module functions and structures
+struct usart_module usart_laser;
+void configure_usart_Laser(void);
+enum LASER_MESSAGE_TYPE laserMessageType(void);
+enum status_code writeLaser(char *tx_data,uint16_t length);
+void readLaserCallback(struct usart_module *const usart_module);
+void writeLaserCallback(struct usart_module *const usart_module);
+bool isLaserTransmitComplete(void);
+bool isLaserReceiveComplete(void);
+void rxBufferLaserClear(void);
 
 // I2C setup
 //I2C addresses   note:  must be 7-bit; does not include R/W bit

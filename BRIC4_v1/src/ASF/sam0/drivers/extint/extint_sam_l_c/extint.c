@@ -78,8 +78,8 @@ struct _extint_module _extint_dev;
 			(EXTINT_DETECT_FALLING == (detection_criteria)) ? true : (\
 			(EXTINT_DETECT_BOTH == (detection_criteria)) ? true : false))))
 
-static void _extint_enable(void);
-static void _extint_disable(void);
+static void _extint_enable(void);//  Added by KFausnight 20210114
+static void _extint_disable(void);//  Added by KFausnight 20210114
 
 /**
  * \brief Determines if the hardware module(s) are currently synchronizing to the bus.
@@ -95,6 +95,7 @@ static void _extint_disable(void);
  * \retval true  If the module synchronization is ongoing
  * \retval false If the module has completed synchronization
  */
+/*
 static inline bool extint_is_syncing(void)
 {
 	Eic *const eics[EIC_INST_NUM] = EIC_INSTS;
@@ -108,6 +109,7 @@ static inline bool extint_is_syncing(void)
 	return false;
 }
 
+*/
 /**
  * \internal
  * \brief Initializes and enables the External Interrupt driver.

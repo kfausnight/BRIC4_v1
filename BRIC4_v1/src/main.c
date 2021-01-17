@@ -24,16 +24,24 @@ uint32_t debug_ct1, debug_ct2;
 
 //  State Machine Info
 volatile enum INPUT current_input, last_input; // Current and Last Inputs
-volatile enum STATE current_state; //  Current State
-volatile bool state_change = true;
+volatile enum STATE current_state, last_state; //  Current State
+volatile bool state_change;
 //  Status Variables
-
 volatile bool isCharging = false;//  Variable to track when plugged in and charging
+volatile bool SD_WriteLockout = false;  //  Locks out internal write processes when USB connected to computer
 volatile bool buttonE_triggered = false; // Variable to track when external button is triggered
+char BleClientMAC[20];//  Connected Device (client) MAC Address
+char BleDeviceMAC[20]; //  This device (BRIC4) MAC address
+char BleDeviceName[20]; // BRIC4 device name (e.g. "BRIC4_0039")
+char BleCommandQueue[20];//  Queued BLE command
 //  Options structure
 struct OPTIONS options;
+//  Measurement Tracker
+struct BLE_SYNC_TRACKER bleSyncTracker;
 //  Time structures
-struct TIME current_time, temp_time;
+struct TIME current_time;
+//  Temperature
+float currentTempC;
 //SD card functions
 FATFS FatFS;         /* Work area (file system object) for logical drives */
 //FIL file1, file2, file_cal_report, file_cal_raw;      /* file objects */
@@ -49,9 +57,13 @@ volatile uint8_t rxBufferLaser[UART_BUFFER_LENGTH];
 volatile uint8_t rxBufferLaserIndex;
 volatile char rxBufferBle[UART_BUFFER_LENGTH];
 volatile uint8_t rxBufferBleIndex;
+volatile char laserDebugBuff[DEBUG_BUFFER_LENGTH];
+volatile uint32_t laserDebugBuffIndex = 0;
+char *laserDebugBuffPtr;
 volatile char debugBuff[DEBUG_BUFFER_LENGTH];
 volatile uint32_t debugBuffIndex = 0;
 char *debugBuffPtr;
+char *bleBuffPtr;
 
 //  Calibration Data Buffers
 // Azm and Inc Calibration
@@ -70,275 +82,368 @@ float loop_distance, loop_horizontal, loop_vertical, loop_azimuth, loop_error;
 struct INST_CAL a1_calst, a2_calst, m1_calst, m2_calst, dist_calst;
 struct CAL_REPORT cal_report;
 
-// Measurement Data Buffers
-struct MEASUREMENT data_buf[NBUFF_MEAS];
-uint8_t data_buf_ind = 0;
-uint32_t data_ref = 0;
-
-//  Interrupt Management
-void configure_extint_channel(void);
-void configure_extint_callbacks(void);
-void extint_routine(void);
-
-
+// Measurement Display Data Buffers
+struct MEASUREMENT measBuf[N_MEASBUF];
+uint32_t measBufInd = 0;
+uint32_t refIndex = 1;
 
 //  USB funcations
-bool my_flag_autorize_msc_transfert = false;
 bool usb_transaction_requested = false;
-//bool my_callback_msc_enable(void);
-//void my_callback_msc_disable(void);
-//void msc_notify_trans(void);
-
 
 // Menu cursors
-int cur_X;
-int cur_Y;
-int cur_X_low;
-int cur_X_high;
-int cur_Y_low;
-int cur_Y_high;
+uint8_t curY, curY_off, curY_N;
 
 
 
-typedef struct
+
+
+
+typedef void (*stateFunction)(void);
+
+typedef struct  
 {
-	enum STATE current;
-	enum INPUT input;
-	enum STATE next;
-} STATE_NEXTSTATE;
+	stateFunction Function;
+	enum STATE	genGOTO[N_GENERIC_INPUTS];
+} STATE_INFO;
 
-typedef void (*State_function)(void);
-typedef struct
-{
-	enum STATE current;
-	//State_function Initial_function;
-	State_function Function;
-
-} STATE_FUNCTIONS;
-
-
-STATE_NEXTSTATE state_nextstate[] = {
-	//  Current State		Input           Next State
-	{st_main_display,	input_1sec,		st_main_display},
-	{st_main_display,	input_button1,	st_menu1},
-	{st_main_display,	input_button2,	st_main_display},
-	{st_main_display,	input_button3,	st_main_display},
-	{st_main_display,	input_button4,	st_menu1},
-	{st_main_display,	input_buttonE,	st_aim},
-	{st_main_display,	input_powerdown,	st_powerdown},
+const STATE_INFO state_info[]= {
+	[st_main_display].Function = fn_main_display,
+	[st_main_display].genGOTO = {
+		[input_button1] = st_menu1,
+		[input_button2] = st_NULL,
+		[input_button3] = st_NULL,
+		[input_button4] = st_menu1,
+		[input_buttonE] = st_NULL,
+		[input_pwrDown] = st_powerdown,
+	},
 	
-	{st_aim,			input_button1,	st_aim_abort},
-	{st_aim,			input_button2,	st_aim_abort},
-	{st_aim,			input_button3,	st_aim_abort},
-	{st_aim,			input_button4,	st_aim_abort},
-	{st_aim,			input_buttonE,	st_measure},
-	{st_aim,			input_powerdown,	st_powerdown},
-	{st_aim,			input_1sec,	st_aim},
-	{st_aim,			input_laser_timeout, st_aim_abort},
-		
-	{st_aim_abort,		input_state_complete,	st_main_display},
+	[st_scan].Function = fn_scan,
+	[st_scan].genGOTO = {
+		[input_button1] = st_NULL,
+		[input_button2] = st_NULL,
+		[input_button3] = st_NULL,
+		[input_button4] = st_NULL,
+		[input_buttonE] = st_NULL,
+		[input_pwrDown] = st_NULL,
+	},
 	
-	{st_measure,		input_state_complete,	st_main_display},
-
-	{st_powerdown,		input_button1,	st_powerup},
-	{st_powerdown,		input_button2,	st_powerup},
-	{st_powerdown,		input_button3,	st_powerup},
-	{st_powerdown,		input_button4,	st_powerup},
-	{st_powerdown,		input_wakeup,	st_powerup},
-	{st_powerdown,		input_usb_transaction,	st_powerup},
-		
-
-	{st_powerup,		input_state_complete,	st_main_display},
 	
-	{st_menu1,			input_button4,			st_main_display},
-	{st_menu1,			input_buttonE,			st_main_display},	
-	{st_menu1,			input_set_clock,		st_set_clock},
-	{st_menu1,			input_set_bluetooth,	st_set_bluetooth},
-	{st_menu1,			input_set_units,		st_set_options},
-	{st_menu1,			input_cal_menu,			st_menu_cal},
-	{st_menu1,			input_error_info,		st_error_info},
-	{st_menu1,			input_menu_debug,		st_menu_debug},
-	{st_menu1,			input_powerdown,		st_powerdown},
+	[st_powerup].Function = fn_powerup,
+	[st_powerup].genGOTO = {
+		[input_button1] = st_NULL,
+		[input_button2] = st_NULL,
+		[input_button3] = st_NULL,
+		[input_button4] = st_NULL,
+		[input_buttonE] = st_NULL,
+		[input_pwrDown] = st_NULL,
+	},
 	
-	{st_set_clock,		input_button4,			st_menu1},
-	{st_set_clock,		input_buttonE,			st_main_display},	
-	{st_set_clock,		input_state_complete,	st_main_display},
-	{st_set_clock,		input_powerdown,		st_powerdown},
+	[st_powerdown].Function = fn_powerdown,
+	[st_powerdown].genGOTO = {
+		[input_button1] = st_powerup,
+		[input_button2] = st_powerup,
+		[input_button3] = st_powerup,
+		[input_button4] = st_powerup,
+		[input_buttonE] = st_powerup,
+		[input_pwrDown] = st_NULL,
+	},
 	
-	{st_set_bluetooth,		input_button4,			st_main_display},
-	{st_set_bluetooth,		input_buttonE,			st_main_display},
-	{st_set_bluetooth,		input_state_complete,	st_main_display},
-	//{st_set_bluetooth,		input_powerdown,		st_powerdown},		
 	
-	{st_set_options,		input_button4,			st_menu1},
-	{st_set_options,		input_buttonE,			st_main_display},
-	{st_set_options,		input_state_complete,	st_main_display},
-	{st_set_options,		input_powerdown,		st_powerdown},
-		
-	{st_menu_cal,		input_button4,				st_menu1},
-	{st_menu_cal,		input_buttonE,				st_main_display},
-	{st_menu_cal,		input_dist_calibration,		st_dist_calibration},
-	{st_menu_cal,		input_inc_azm_full_calibration,	st_inc_azm_full_calibration},
-	{st_menu_cal,		input_azm_quick_calibration,	st_azm_quick_calibration},
-	{st_menu_cal,		input_state_complete,		st_main_display},
-	{st_menu_cal,		input_disp_cal_report,		st_disp_cal_report},	
-	{st_menu_cal,		input_loop_test,			st_loop_test},
-	{st_menu_cal,		input_powerdown,			st_powerdown},
-		
-	{st_menu_debug,		input_button4,				st_menu1},
-	{st_menu_debug,		input_buttonE,				st_main_display},
-	{st_menu_debug,		input_debug_rawData,		st_debug_rawData},
-	{st_menu_debug,		input_debug_backlight,		st_debug_backlight},	
-	{st_menu_debug,		input_debug_charger,		st_debug_charger},	
-	{st_menu_debug,		input_powerdown,			st_powerdown},
-	{st_menu_debug,		input_reprocess_inc_azm_cal,			st_process_inc_azm_full_cal},
-	{st_menu_debug,		input_reprocess_azm_quick_cal,			st_process_azm_quick_cal},
+	[st_menu1].Function = fn_menu1,
+	[st_menu1].genGOTO = {
+		[input_button1] = st_NULL,
+		[input_button2] = st_NULL,
+		[input_button3] = st_NULL,
+		[input_button4] = st_main_display,
+		[input_buttonE] = st_main_display,
+		[input_pwrDown] = st_powerdown,
+	},
 	
-	{st_azm_quick_calibration,		input_button4,				st_aim_abort},
-	{st_azm_quick_calibration,		input_state_complete,		st_process_azm_quick_cal},
-		
-	{st_inc_azm_full_calibration,		input_button4,				st_aim_abort},
-	{st_inc_azm_full_calibration,		input_state_complete,		st_process_inc_azm_full_cal},	
-		
-	{st_dist_calibration,		input_button4,				st_aim_abort},
-	{st_dist_calibration,		input_state_complete,		st_disp_cal_report},
-		
-	{st_disp_cal_report,		input_state_complete,		st_main_display},
-	{st_disp_cal_report,		input_buttonE,				st_main_display},
-	{st_disp_cal_report,		input_button4,				st_main_display},
-		
-	{st_loop_test,				input_button4,				st_aim_abort},
-	{st_loop_test,				input_state_complete,		st_disp_loop_report},
-		
-	{st_disp_loop_report,		input_button4,			st_main_display},
-	{st_disp_loop_report,		input_button3,			st_main_display},
-	{st_disp_loop_report,		input_button2,			st_main_display},
-	{st_disp_loop_report,		input_button1,			st_main_display},
-	{st_disp_loop_report,		input_buttonE,			st_main_display},
-	{st_disp_loop_report,		input_powerdown,		st_powerdown},
-		
-	{st_process_inc_azm_full_cal,	input_state_complete,	st_disp_cal_report},
-	{st_process_azm_quick_cal,		input_state_complete,	st_disp_cal_report},
-		
-	{st_error_info,		input_button4,				st_main_display},
-	{st_error_info,		input_buttonE,				st_main_display},	
-	{st_error_info,		input_powerdown,			st_powerdown},
-	{st_error_info,		input_state_complete,	st_main_display},
-		
-		
-	{st_debug_rawData,					input_button1,			st_menu1},
-	{st_debug_rawData,					input_button4,			st_menu1},
-	{st_debug_rawData,					input_powerdown,		st_powerdown},
-		
-	{st_debug_charger,					input_button1,			st_menu1},
-	{st_debug_charger,					input_button4,			st_menu1},
-	{st_debug_charger,					input_powerdown,		st_powerdown},
-		
-	{st_debug_backlight,					input_buttonE,			st_menu1},
-	{st_debug_backlight,					input_powerdown,		st_powerdown},
-				
 	
-	{0,0,0}
+	[st_set_clock].Function = fn_set_clock,
+	[st_set_clock].genGOTO = {
+		[input_button1] = st_NULL,
+		[input_button2] = st_NULL,
+		[input_button3] = st_NULL,
+		[input_button4] = st_menu1,
+		[input_buttonE] = st_main_display,
+		[input_pwrDown] = st_powerdown,
+	},
+	
+	
+	[st_menu_BLE].Function = fn_menu_BLE,
+	[st_menu_BLE].genGOTO = {
+		[input_button1] = st_NULL,
+		[input_button2] = st_NULL,
+		[input_button3] = st_NULL,
+		[input_button4] = st_menu1,
+		[input_buttonE] = st_main_display,
+		[input_pwrDown] = st_NULL,
+	},
+	
+	
+	[st_debug_BLE].Function = fn_debug_BLE,
+	[st_debug_BLE].genGOTO = {
+		[input_button1] = st_NULL,
+		[input_button2] = st_NULL,
+		[input_button3] = st_NULL,
+		[input_button4] = st_menu_BLE,
+		[input_buttonE] = st_main_display,
+		[input_pwrDown] = st_NULL,
+	},
+	
+	
+	[st_set_options].Function = fn_set_options,
+	[st_set_options].genGOTO = {
+		[input_button1] = st_NULL,
+		[input_button2] = st_NULL,
+		[input_button3] = st_NULL,
+		[input_button4] = st_menu1,
+		[input_buttonE] = st_main_display,
+		[input_pwrDown] = st_powerdown,
+	},
+	
+	
+	[st_menu_cal].Function = fn_menu_cal,
+	[st_menu_cal].genGOTO = {
+		[input_button1] = st_NULL,
+		[input_button2] = st_NULL,
+		[input_button3] = st_NULL,
+		[input_button4] = st_menu1,
+		[input_buttonE] = st_main_display,
+		[input_pwrDown] = st_powerdown,
+	},
+	
+	
+	[st_menu_debug].Function = fn_menu_debug,
+	[st_menu_debug].genGOTO = {
+		[input_button1] = st_NULL,
+		[input_button2] = st_NULL,
+		[input_button3] = st_NULL,
+		[input_button4] = st_menu1,
+		[input_buttonE] = st_main_display,
+		[input_pwrDown] = st_powerdown,
+	},
+	
+	[st_inc_azm_full_calibration].Function = fn_inc_azm_full_calibration,
+	[st_inc_azm_full_calibration].genGOTO = {
+		[input_button1] = st_NULL,
+		[input_button2] = st_NULL,
+		[input_button3] = st_NULL,
+		[input_button4] = st_main_display,
+		[input_buttonE] = st_NULL,
+		[input_pwrDown] = st_NULL,
+	},
+	
+	[st_dist_calibration].Function = fn_dist_calibration,
+	[st_dist_calibration].genGOTO = {
+		[input_button1] = st_NULL,
+		[input_button2] = st_NULL,
+		[input_button3] = st_NULL,
+		[input_button4] = st_main_display,
+		[input_buttonE] = st_NULL,
+		[input_pwrDown] = st_NULL,
+	},
+	
+	[st_azm_quick_calibration].Function = fn_azm_quick_calibration,
+	[st_azm_quick_calibration].genGOTO = {
+		[input_button1] = st_NULL,
+		[input_button2] = st_NULL,
+		[input_button3] = st_NULL,
+		[input_button4] = st_main_display,
+		[input_buttonE] = st_NULL,
+		[input_pwrDown] = st_NULL,
+	},
+	
+	[st_process_inc_azm_full_cal].Function = fn_process_inc_azm_full_cal,
+	[st_process_inc_azm_full_cal].genGOTO = {
+		[input_button1] = st_NULL,
+		[input_button2] = st_NULL,
+		[input_button3] = st_NULL,
+		[input_button4] = st_NULL,
+		[input_buttonE] = st_NULL,
+		[input_pwrDown] = st_NULL,
+	},
+	
+	[st_process_azm_quick_cal].Function = fn_process_azm_quick_cal,
+	[st_process_azm_quick_cal].genGOTO = {
+		[input_button1] = st_NULL,
+		[input_button2] = st_NULL,
+		[input_button3] = st_NULL,
+		[input_button4] = st_NULL,
+		[input_buttonE] = st_NULL,
+		[input_pwrDown] = st_NULL,
+	},
+	
+	[st_disp_cal_report].Function = fn_disp_cal_report,
+	[st_disp_cal_report].genGOTO = {
+		[input_button1] = st_NULL,
+		[input_button2] = st_NULL,
+		[input_button3] = st_NULL,
+		[input_button4] = st_main_display,
+		[input_buttonE] = st_main_display,
+		[input_pwrDown] = st_powerdown,
+	},
+	
+	[st_loop_test].Function = fn_loop_test,
+	[st_loop_test].genGOTO = {
+		[input_button1] = st_NULL,
+		[input_button2] = st_NULL,
+		[input_button3] = st_NULL,
+		[input_button4] = st_main_display,
+		[input_buttonE] = st_NULL,
+		[input_pwrDown] = st_NULL,
+	},
+	
+	[st_disp_loop_report].Function = fn_disp_loop_report,
+	[st_disp_loop_report].genGOTO = {
+		[input_button1] = st_main_display,
+		[input_button2] = st_main_display,
+		[input_button3] = st_main_display,
+		[input_button4] = st_main_display,
+		[input_buttonE] = st_main_display,
+		[input_pwrDown] = st_powerdown,
+	},
+	
+	[st_debug_rawData].Function = fn_debug_rawData,
+	[st_debug_rawData].genGOTO = {
+		[input_button1] = st_menu1,
+		[input_button2] = st_NULL,
+		[input_button3] = st_NULL,
+		[input_button4] = st_menu1,
+		[input_buttonE] = st_NULL,
+		[input_pwrDown] = st_powerdown,
+	},
+	
+	[st_debug_backlight].Function = fn_debug_backlight,
+	[st_debug_backlight].genGOTO = {
+		[input_button1] = st_NULL,
+		[input_button2] = st_NULL,
+		[input_button3] = st_NULL,
+		[input_button4] = st_NULL,
+		[input_buttonE] = st_main_display,
+		[input_pwrDown] = st_powerdown,
+	},
+	
+	[st_debug_charger].Function = fn_debug_charger,
+	[st_debug_charger].genGOTO = {
+		[input_button1] = st_menu1,
+		[input_button2] = st_NULL,
+		[input_button3] = st_NULL,
+		[input_button4] = st_menu_debug,
+		[input_buttonE] = st_menu1,
+		[input_pwrDown] = st_powerdown,
+	},
+	
+	[st_firmware].Function = fn_firmware,
+	[st_firmware].genGOTO = {
+		[input_button1] = st_NULL,
+		[input_button2] = st_NULL,
+		[input_button3] = st_NULL,
+		[input_button4] = st_menu_debug,
+		[input_buttonE] = st_main_display,
+		[input_pwrDown] = st_powerdown,
+	},
+	
+	[st_error_info].Function = fn_error_info,
+	[st_error_info].genGOTO = {
+		[input_button1] = st_NULL,
+		[input_button2] = st_NULL,
+		[input_button3] = st_NULL,
+		[input_button4] = st_menu1,
+		[input_buttonE] = st_main_display,
+		[input_pwrDown] = st_powerdown,
+	},
+	
+	
 };
 
-
-
-
-STATE_FUNCTIONS state_functions[]={
-	//  Current State	Function
-	{st_main_display,	fn_main_display},
-	{st_aim,			fn_aim},
-	{st_aim_abort,		fn_aim_abort},
-	{st_measure,		fn_measure},
-	{st_powerdown,		fn_powerdown},
-	{st_powerup,		fn_powerup},
-	{st_set_clock,		fn_set_clock	},
-	{st_set_bluetooth,	fn_set_bluetooth},
-	{st_set_options,	fn_set_options	},
-	{st_menu1,			fn_menu1	},
-	{st_menu_cal,		fn_menu_cal},
-	{st_menu_debug,		fn_menu_debug},
-	{st_inc_azm_full_calibration,		fn_inc_azm_full_calibration},
-	{st_dist_calibration,			fn_dist_calibration},
-	{st_azm_quick_calibration,		fn_azm_quick_calibration},
-	{st_process_inc_azm_full_cal,		fn_process_inc_azm_full_cal},
-	{st_process_azm_quick_cal,		fn_process_azm_quick_cal},
-	{st_disp_cal_report,			fn_disp_cal_report},	
-	{st_loop_test,					fn_loop_test},
-	{st_disp_loop_report,			fn_disp_loop_report},	
-	{st_debug_rawData,				fn_debug_rawData},
-	{st_debug_backlight,			fn_debug_backlight},
-	{st_debug_charger,				fn_debug_charger},
-	{st_error_info,					fn_error_info},
-
-};
 
 
 
 
 int main (void)
-{
-	uint8_t iter; // Iteration counter
-	
-	uint32_t sizeDebug1, sizeDebug2; 
-	
 
-	system_init();
+  {
+	system_init();	
 	delay_init();	
 	delay_ms(500);	
 	
 	
+	configure_timer_counter();
 	fn_powerup();
 	
-	configure_timer_counter();
+	delay_s(1);
 	
 	//EEPROM_test();
-	
-
-	setChargeCurrent(options.chargeCurrent);
-	setup_batt();
-	sleepmgr_init();
 	load_user_settings();
 	load_calibration();
 	
-	options.SerialNumber = getSN();
+	//  Battery Setup
+	setupCharger();	
+	setup_batt();
+	
+	sleepmgr_init();
+	
+	
+	getSN();
 	
 	//BLE Setup
 	BLE_init();
 	
+	//  Load Sync Tracker and any measurements on SD card
+	load_sync_tracker();
+	loadMeasBuffer();
+	//  Initialize states and inputs
 	current_state = st_main_display;
+	last_state = st_NULL;
 	current_input = input_1sec;
-	
-	////////////////////////////////debug
-	// Disable watchdog timer
-	//wdt_disable();
-	////////////////////////
-	
+	last_input = input_none;
 	
 	while(1){
 
-		while ((current_input==input_none)){
-			//  Handle any USB transactions
-			if (usb_transaction_requested){
-				spi_setBaud(baudRateMax);
-				while(udi_msc_process_trans());
-				
-				usb_transaction_requested = false;		
-				spi_setBaud(baudRateMin);		
-			}
-			//  Handle any BLE messages that have arrived
-			BLE_handleMessage();
-			//  Return to Sleep State
-			if (current_state==st_powerdown){
-				sleepmgr_sleep(SLEEPMGR_STANDBY);
-			}else{
-				sleepmgr_sleep(SLEEPMGR_IDLE);
-			}
+		do {
+			//  Idle Loop
+			//  Take care of any background processes and go back to sleep
 			
-		}
+			//  Break if a state change
+			if (last_state!=current_state){break;}
+			
+				
+			//  Handle any USB transactions
+			UsbHandleTransactions();
+			
+			// Upload any outstanding measurements over BLE
+			SyncDataBLE();
+						
+			//  Return to Sleep State
+			if(current_input==input_none){
+				if (current_state==st_powerdown){
+					sleepmgr_sleep(SLEEPMGR_STANDBY);
+				}else{
+					sleepmgr_sleep(SLEEPMGR_IDLE);
+				}
+			}			
+			debug1++;
+		}while ((current_input==input_none)||
+			(current_input == input_BLE_message)||
+			(current_input == input_usb_transaction));
 		
 		debug2++;
-		wdt_reset_count();
+		
+		//  Pet Watchdog
+		if(current_state!=st_powerdown){
+			wdt_reset_count();
+		}
+		
+		
+		//  Handle any remote BLE commands
+		if(current_input == input_BLE_command){
+			BLE_remoteCommand(BleCommandQueue);
+		}
+		
+		//  Get BLE Connection Status and client MAC address
+		BLE_get_client_MAC();
 		
 		//  Determine if idle powerdown will be performed		
 		idle_timeout();//Will produce input = input_powerdown if idle
@@ -346,38 +451,122 @@ int main (void)
 		//  Laser Timeout
 		laser_timeout();
 		
-		
-		
-		//  Find state 
-		//  State a function of current input		
-		state_change = false;
-		for (iter=0; iter<(sizeof(state_nextstate)/sizeof(STATE_NEXTSTATE));iter++){
-			if((current_state==state_nextstate[iter].current) && (current_input==state_nextstate[iter].input)){
-				if(current_state!=state_nextstate[iter].next){
-					current_state = state_nextstate[iter].next;
-					state_change = true;
-				}
-				break;
+		//  Battery Level Update
+		BleUpdateBattLevel(); //  Update battery level characteristic if it changes
+		if(!isCharging){SD_WriteLockout = false;}
+				
+		//  Determine if current input brings new state
+		if (current_input<N_GENERIC_INPUTS){
+			enum STATE st_temp;
+			st_temp = state_info[current_state].genGOTO[current_input];
+			if (st_temp!=st_NULL){
+				current_state = st_temp;
 			}
 		}
-		last_input = current_input;
+		
+		//  Catch jut in case state set to st_NULL
+		if (current_state == st_NULL){current_state = last_state;}
+		
+		//  Flag a new change of state
+		state_change = !(last_state==current_state);
+		last_state = current_state;
+		
+		//  Reset inputs prior to performing state functions
+		//  Reset last input; helps avoid buggy menus
+		if (state_change){
+			last_input = input_none;
+		}else{
+			last_input = current_input;
+		}		
 		current_input = input_none;
 		
-		//  Find and run function for current state
-		for(iter=0;iter<(sizeof(state_functions)/sizeof(STATE_FUNCTIONS));iter++){
-			if(current_state==state_functions[iter].current){
-				state_functions[iter].Function();				
-				break;
-			}
+		//  Turn off laser in case it is accidentally left on from previous state
+		if(state_change && isLaserOn()){
+			rangefinder_on_off(false);
 		}
-
+		
+		//  Perform function associated with current state		
+		state_info[current_state].Function();
+		
+		/*
+		if (current_state!= st_powerdown){
+			sprintf(display_str,"                ");
+			glcd_tiny_draw_string(0,5,display_str);
+			sprintf(display_str,"%d, %d", debug1, debug2);
+			glcd_tiny_draw_string(0,5,display_str);
+			glcd_write();
+			debug1 = 0;
+		}
+		*/
+		
 	}//End of main program while loop
 }//end of main
 
+
+
+void fn_scan(void){
+	struct MEASUREMENT_FULL tempMeas;
+	int dataRate;
+	
+	if (state_change){
+		
+		//  Display
+		glcd_clear_buffer();
+		sprintf(display_str,"Scan Mode:");
+		glcd_tiny_draw_string(0,0,display_str);
+		
+		// Connected to
+		glcd_tiny_draw_string(0, 1,"Streaming Data ");
+		glcd_tiny_draw_string(0, 2,"over BLE");
+		glcd_tiny_draw_string(0, 4,"Connected to:");
+		glcd_tiny_draw_string(10, 5,BleClientMAC);
+		
+		glcd_write();
+		
+		//  Start Measurements
+		laser_start_continuous();
+		rxBufferLaserClear();
+		
+		
+	}
+	dataRate = 0;
+	while (current_input==input_none){
+		//   Read data
+		full_measurement(&tempMeas, 0, measScan);
+		//scan_measurement(&tempMeas);
+		//  Send measurement over bluetooth
+		if (tempMeas.distRaw!=0){
+			//  Only send if distance data was valid (not 0)
+			//  Send over BLE, save to SD, and increment reference
+			//processMeasurement(&tempMeas);
+
+			dataRate++;
+		}
+		
+	}
+	
+	sprintf(display_str,"Meas Rate: %d hz   ", dataRate);
+	glcd_tiny_draw_string(0, 7,display_str);
+	glcd_write();
+	
+	if((current_input!=input_none)&&
+	   (current_input!=input_1sec)&&
+	   (current_input!=input_BLE_message)){
+		//  Close up and return
+		rangefinder_on_off(false);
+		rxBufferBleClear();
+		current_state = st_main_display;
+		current_input= input_none;
+		
+	}
+	
+}
+
+
 void fn_debug_charger(void){
 	uint8_t addressList[] = {
-		0x00, 
 		0x02,
+		0x04,
 		0x06,
 		0x07,
 		0x0B,
@@ -390,9 +579,6 @@ void fn_debug_charger(void){
 	
 	//  Set initial conditions
 	if (state_change) {
-		cur_Y = 2;
-		cur_Y_low = 2;
-		cur_Y_high = 5;
 	}
 		
 	// Display
@@ -410,11 +596,6 @@ void fn_debug_charger(void){
 		
 	}
 	
-	
-	
-	
-	
-	
 	glcd_write();
 	
 }
@@ -422,7 +603,7 @@ void fn_debug_charger(void){
 
 void fn_debug_rawData(void){
 	
-	struct MEASUREMENT meas_debug;
+	struct MEASUREMENT_FULL meas_debug;
 	quick_measurement( &meas_debug);	
 		
 
@@ -463,12 +644,10 @@ void fn_azm_quick_calibration(void){
 	
 	float m1Buf[NBUFFQAZM][3];
 	float m2Buf[NBUFFQAZM][3];
-	bool isStable1, isStable2;
 	
-	struct MEASUREMENT tempM;
+	struct MEASUREMENT_FULL tempM;
 	float xPos, yPos;
-	bool tracker[NBUFF];
-	float debug;
+	static bool tracker[NBUFF];
 
 	static uint32_t measCounterCurrent = 0;
 	static uint32_t measCounterLast = 0;
@@ -570,10 +749,12 @@ void fn_azm_quick_calibration(void){
 		
 		
 		if (nPoints>=trackerInd){
+		//if (nPoints>=10){
 			//  Save all Calibration Raw Data
 			cal_done(azm_quick);
 			// Signal completion
-			current_input = input_state_complete;
+			current_state = st_process_azm_quick_cal;
+			break;
 		}
 	}
 	measCounterLast = measCounterCurrent;
@@ -600,14 +781,14 @@ void fn_process_azm_quick_cal(void){
 	glcd_write();
 	delay_s(3);
 	// Signal completion
-	current_input = input_state_complete;
+	current_state = st_disp_cal_report;
 	
 }
 
 
 void fn_inc_azm_full_calibration(void){
-	struct MEASUREMENT temp_meas;
-	uint32_t i, k;
+	struct MEASUREMENT_FULL temp_meas;
+	uint32_t i;
 	
 	if (state_change){
 		cal_disp_message();
@@ -625,11 +806,10 @@ void fn_inc_azm_full_calibration(void){
 				//  Turn off Rangefinder
 				rangefinder_on_off(false);
 				//  Save all Calibration Raw Data
-				
 				cal_done(inc_azm_full);
 				
 				// Signal completion
-				current_input = input_state_complete;
+				current_state = st_process_inc_azm_full_cal;
 			}
 			break;
 		case input_button3:
@@ -643,7 +823,7 @@ void fn_inc_azm_full_calibration(void){
 				laser_on_off(true);
 			}else{
 				//  Take measurement and process data
-				full_measurement(&temp_meas, options.shot_delay);
+				full_measurement(&temp_meas, options.shot_delay, measCal);
 				//  Turn laser module off
 				rangefinder_on_off(false);
 				cal_add_datapoint(&temp_meas);
@@ -687,7 +867,7 @@ void fn_inc_azm_full_calibration(void){
 	
 	//  Draw Points
 	uint8_t ind;
-	float posX_A, posY_A, posX_M, posY_M;	
+	float posX_A, posX_M;	
 	for (i=0;i<nGroups;i++){
 		//  One mark for each group
 		ind = i*GROUP_SIZE;
@@ -704,7 +884,7 @@ void fn_inc_azm_full_calibration(void){
 	#define statBarMinX	88
 	#define statBarSpace	10
 	#define circleRadius	5
-	uint8_t xCir, yCir;
+	uint8_t yCir;
 	for (i=0;i<GROUP_SIZE;i++){
 		yCir = statBarMinY + i*statBarSpace;
 		if (i<cal_getGroupPoints()){
@@ -761,7 +941,8 @@ void fn_inc_azm_full_calibration(void){
 
 void fn_process_inc_azm_full_cal(void){
 	
-	int32_t i, j, k, g, iter;
+	uint32_t  k, iter;
+	int32_t g;
 	bool tempGroupRemove[NGROUP];
 	bool permGroupRemove[NGROUP];
 	float incErrArray[NGROUP];
@@ -782,6 +963,11 @@ void fn_process_inc_azm_full_cal(void){
 		tempGroupRemove[k] = false;// track temporarily eliminated loop group
 		incErrArray[k] = 0;
 		azmErrArray[k] = 0;
+	}
+	for (k=0;k<MAX_BAD_GROUPS;k++){
+		cal_report.groupRemoved[k] = 0;
+		cal_report.groupRemovedSource[k] = 0;
+		cal_report.groupRemovedImprovement[k] = 0;
 	}
 	
 	glcd_clear_buffer();
@@ -828,13 +1014,21 @@ void fn_process_inc_azm_full_cal(void){
 								
 		}//  End Loop:  Cycle through all groups
 		
+		//  Evaluate calibration, find bad groups
+		uint8_t badGroupSource;
 		uint32_t badGroup = 0;
 		float badGroupDelta = 0;
-		cal_findBadGroup(incErrArray, azmErrArray, &badGroup, &badGroupDelta);
+		badGroupSource = cal_findBadGroup(incErrArray, azmErrArray, &badGroup, &badGroupDelta);
 		
 		
 		if (badGroupDelta>BAD_GROUP_THRESHOLD){
+			//  Remove Group
 			permGroupRemove[badGroup] = true;
+			//  Log removal
+			cal_report.groupRemoved[iter] = badGroup;
+			cal_report.groupRemovedSource[iter] = badGroupSource;
+			cal_report.groupRemovedImprovement[iter] = badGroupDelta;
+			//  Print Status
 			sprintf(display_str, "Detected Bad Group");
 			glcd_tiny_draw_string(0,4,display_str);
 			sprintf(display_str, "                     ");// Clear line
@@ -861,7 +1055,6 @@ void fn_process_inc_azm_full_cal(void){
 	save_calibration();
 	
 	// Calibration Complete
-	//wdt_reset_count();
 	glcd_clear_buffer();
 	sprintf(display_str, "Calibration Complete!");
 	glcd_tiny_draw_string(0,2,display_str);
@@ -871,20 +1064,18 @@ void fn_process_inc_azm_full_cal(void){
 	// Re-Enable Watchdog Timer
 	wdt_enable();
 	
-	current_input = input_state_complete;
+	current_state = st_disp_cal_report;
 }
 
 
 void fn_loop_test(void){
-	struct MEASUREMENT temp_meas;
+	struct MEASUREMENT_FULL temp_meas;
 	//uint32_t timer_count;
-	uint8_t i;
 	
 	if (state_change){
 		cal_disp_message();
 		//  Set up initial settings
 		cal_init();
-		last_input = input_none;
 	}
 	
 	// Button Handler
@@ -892,7 +1083,7 @@ void fn_loop_test(void){
 		case input_button1:
 			//  Calibration Done button
 			ioport_set_pin_level(laser_reset, false);
-			current_input = input_state_complete;
+			current_state = st_disp_loop_report;
 			break;
 		case input_buttonE:
 			//  Set laser and then take measurement
@@ -902,7 +1093,7 @@ void fn_loop_test(void){
 				laser_on_off(true);
 			}else{
 				//  Take measurement and process data
-				full_measurement(&temp_meas, options.shot_delay);
+				full_measurement(&temp_meas, options.shot_delay, measCal);
 				//  Turn laser module off
 				rangefinder_on_off(false);
 				//  Process datapoint
@@ -916,8 +1107,6 @@ void fn_loop_test(void){
 		default:
 			break;
 	}
-	last_input = input_none;
-	
 
 	glcd_clear_buffer();
 	
@@ -968,7 +1157,7 @@ void fn_loop_test(void){
 
 
 void fn_dist_calibration(void){
-	struct MEASUREMENT temp_meas;
+	struct MEASUREMENT_FULL temp_meas;
 	
 	//uint32_t timer_count;
 	uint8_t k;
@@ -977,7 +1166,6 @@ void fn_dist_calibration(void){
 		cal_disp_message();
 		//  Set up initial settings
 		cal_init();
-		last_input = input_none;
 	}
 	
 	// Button Handler
@@ -987,7 +1175,8 @@ void fn_dist_calibration(void){
 			if (cal_getGroupPoints() >= SHOT_SIZE){
 				//  Turn off rangefinder
 				rangefinder_on_off(false);
-				current_input = input_state_complete;
+				cal_done(rangeFinder);
+				current_state = st_disp_cal_report;
 			}
 			break;
 		case input_buttonE:
@@ -997,10 +1186,12 @@ void fn_dist_calibration(void){
 				rangefinder_on_off(true);
 				laser_on_off(true);
 			}else{
-				//  Take measurement and process data
-				full_measurement(&temp_meas, options.shot_delay);
+				//  Take measurement
+				full_measurement(&temp_meas, options.shot_delay, measCal);
 				//  Turn laser module off
 				rangefinder_on_off(true);
+				//  Process point
+				cal_add_dist(&temp_meas);
 			}
 			break;
 		case input_button4:
@@ -1010,7 +1201,6 @@ void fn_dist_calibration(void){
 		default:
 			break;
 	}
-	last_input = input_none;
 	
 
 	glcd_clear_buffer();
@@ -1051,7 +1241,6 @@ void fn_dist_calibration(void){
 
 
 void cal_disp_message(void){
-	wdt_disable();
 	
 	glcd_clear_buffer();
 	
@@ -1110,11 +1299,12 @@ void cal_disp_message(void){
 			break;
 	}
 	
-	
-
+	//  Hold for any button
+	wdt_disable();
 	sprintf(display_str, "Press any button...");
 	glcd_tiny_draw_string(10,7,display_str);
 	glcd_write();
+	current_input = input_none;
 	while((current_input == input_none) || (current_input == input_1sec));//hold here until an input
 	current_input = input_none;
 	wdt_enable();
@@ -1144,88 +1334,9 @@ void  fn_disp_cal_report(void){
 	sprintf(display_str, "Calibration Report:");
 	glcd_tiny_draw_string(0,0,display_str);
 	
-	switch(pageView){
-		///////////////////////// AZM and INC Report
-		case 1:
-			//// Page 1			
-			sprintf(display_str, "Inclination & Azimuth");
-			glcd_tiny_draw_string(0,1,display_str);
-			sprintf(display_str,"20%02x.%02x.%02x@%02x:%02x:%02x",
-				cal_report.time_inc_azm.year, cal_report.time_inc_azm.month, cal_report.time_inc_azm.date,
-				cal_report.time_inc_azm.hours, cal_report.time_inc_azm.minutes, cal_report.time_inc_azm.seconds);
-			glcd_tiny_draw_string(0,2,display_str);
-			sprintf(display_str,"4-Point Groups: %d", cal_report.groups);
-			glcd_tiny_draw_string(0,3,display_str);
-			sprintf(display_str,"Azm Stdev: %.3f", cal_report.azm_angle_err);
-			glcd_tiny_draw_string(0,5,display_str);
-			glcd_draw_circle(98, 41, 1, BLACK);// Draw degree symbol
-			sprintf(display_str,"Inc Stdev: %.3f", cal_report.inc_angle_err);
-			glcd_tiny_draw_string(0,6,display_str);
-			glcd_draw_circle(98, 49, 1, BLACK);// Draw degree symbol
-			if (options.current_unit_temp==fahrenheit){
-				sprintf(display_str,"Temp: %0.1f F", cal_report.time_inc_azm.temperatureF);
-			}else{
-				sprintf(display_str,"Temp: %0.1f C", cal_report.time_inc_azm.temperatureC);
-			}
-			glcd_tiny_draw_string(0,7,display_str);
-			break;
-		case 2:
-			//// Page 2
-			sprintf(display_str, "Inclination:");
-			glcd_tiny_draw_string(0,1,display_str);
-			sprintf(display_str,"20%02x.%02x.%02x@%02x:%02x:%02x",
-			cal_report.time_inc_azm.year, cal_report.time_inc_azm.month, cal_report.time_inc_azm.date,
-			cal_report.time_inc_azm.hours, cal_report.time_inc_azm.minutes, cal_report.time_inc_azm.seconds);
-			glcd_tiny_draw_string(0,2,display_str);
-			// Sensor Disparity
-			sprintf(display_str,"A1-A2 Delta X,Y,Z %%");
-			glcd_tiny_draw_string(0,3,display_str);
-			sprintf(display_str,"%.3f, %.3f, %.3f",
-				cal_report.disp_stdev_acc[0]*100, cal_report.disp_stdev_acc[1]*100, cal_report.disp_stdev_acc[2]*100);
-			glcd_tiny_draw_string(0,4,display_str);
-			//  Magnitude Error			
-			sprintf(display_str,"Magnitude Error %%");
-			glcd_tiny_draw_string(0,5,display_str);
-			sprintf(display_str,"A1:%.3f A2:%.3f", cal_report.mag_stdev_a1*100, cal_report.mag_stdev_a2*100);
-			glcd_tiny_draw_string(0,6,display_str);
-			break;
-		case 3:
-			//// Page 3
-			sprintf(display_str, "Azimuth");
-			glcd_tiny_draw_string(0,1,display_str);
-			sprintf(display_str,"20%02x.%02x.%02x@%02x:%02x:%02x",
-			cal_report.time_quick_azm.year, cal_report.time_quick_azm.month, cal_report.time_quick_azm.date,
-			cal_report.time_quick_azm.hours, cal_report.time_quick_azm.minutes, cal_report.time_quick_azm.seconds);
-			glcd_tiny_draw_string(0,2,display_str);
-			// Sensor Disparity
-			sprintf(display_str,"M1-M2 Delta X,Y,Z %%");
-			glcd_tiny_draw_string(0,3,display_str);
-			sprintf(display_str,"%.3f, %.3f, %.3f",
-			cal_report.disp_stdev_comp[0]*100, cal_report.disp_stdev_comp[1]*100, cal_report.disp_stdev_comp[2]*100);
-			glcd_tiny_draw_string(0,4,display_str);
-			//  Magnitude Error
-			sprintf(display_str,"Magnitude Error %%");
-			glcd_tiny_draw_string(0,5,display_str);
-			sprintf(display_str,"M1:%.3f M2:%.3f", cal_report.mag_stdev_m1*100, cal_report.mag_stdev_m2*100);
-			glcd_tiny_draw_string(0,6,display_str);
-			break;
-		//////////////////////// Distance Report
-		case 4:
-			sprintf(display_str, "Distance");
-			glcd_tiny_draw_string(0,1,display_str);
-			sprintf(display_str,"20%02x.%02x.%02x@%02x:%02x:%02x",
-				cal_report.time_rangeFinder.year, cal_report.time_rangeFinder.month, cal_report.time_rangeFinder.date,
-				cal_report.time_rangeFinder.hours, cal_report.time_rangeFinder.minutes, cal_report.time_rangeFinder.seconds);
-			glcd_tiny_draw_string(0,2,display_str);
-			sprintf(display_str,"Rangefinder Offset:");
-			glcd_tiny_draw_string(0,4,display_str);
-			sprintf(display_str,"  %.4f meters", dist_calst.dist_offset);
-			glcd_tiny_draw_string(0,5,display_str);
-			sprintf(display_str,"  %.4f feet", dist_calst.dist_offset*MT2FT);
-			glcd_tiny_draw_string(0,6,display_str);
-			
-		break;
-	}
+	//  Print Calibration data to glcd buffer
+	disp_report(pageView);
+	
 	
 	// Display soft keys
 	switch (pageView){
@@ -1283,78 +1394,31 @@ void fn_disp_loop_report(void){
 }
 
 
-
-void fn_measure(void){
-	// increment data buffer index
-	data_buf_ind = data_buf_ind+1;
-	if (data_buf_ind >= NBUFF_MEAS){data_buf_ind = 0;}
-	// Increment reference counter
-	data_ref = data_ref+1;
-	if (data_ref>= 999){data_ref = 1;}
-	data_buf[data_buf_ind].index_ref = data_ref;
-	//  Take measurement	
-	full_measurement(&data_buf[data_buf_ind], options.shot_delay);
-	//  Save data to SD card
-	save_measurement(&data_buf[data_buf_ind]);
-	//  Turn laser module off
-	rangefinder_on_off(false);
-	//  Send measurement over bluetooth
-	BLE_sendMeas(&data_buf[data_buf_ind]);
-	
-	//  Complete measurement function
-	current_input = input_state_complete;
-}
-
-void fn_aim(void){
-	//uint32_t timer_count;
-	uint16_t temp_index;
-	
-	if (state_change) {
-		rangefinder_on_off(true);
-		laser_on_off(true);
-	}
-	
-	
-	temp_index = data_buf_ind+1;
-	if(temp_index>=NBUFF_MEAS){temp_index = 0;}
-	
-	
-	quick_measurement(&data_buf[temp_index]);
-	
-	
-	print_data_screen();
-
-}
-
-
 void fn_error_info(void){
-	uint8_t i;
-	static uint8_t shot_list[NBUFF_MEAS+1];
+	uint32_t i;
+	static uint8_t shot_list[N_MEASBUF+1];
 	static uint8_t shot_list_ind;
 	static uint8_t nshots;
-	uint8_t temp_buf_ind;
+	uint32_t temp_buf_ind;
 
 	
 	if (state_change){ // Perform first time entering function
 		// Build list of indexes of bad shots
 		shot_list_ind = 0;
 		nshots = 0;
-		temp_buf_ind = data_buf_ind;
-		for (i=0;i<NBUFF_MEAS;i++){
-			if (data_buf[temp_buf_ind].num_errors>0){
+		temp_buf_ind = measBufInd;
+		for (i=0;i<N_MEASBUF;i++){
+			circBuffDec(&temp_buf_ind, N_MEASBUF);//  Backup to last reading
+			if (measBuf[temp_buf_ind].errCode[0]>0){
 				//  Add shot to list
 				shot_list[shot_list_ind] = temp_buf_ind;
 				shot_list_ind++;
 				nshots++;
 			}
-			
-			if (temp_buf_ind == 0){ temp_buf_ind = NBUFF_MEAS-1;}//  Buffer wrap-around
-			else {temp_buf_ind--;}
+
 		}
 		
 		shot_list_ind = 0;
-
-		last_input = input_none;
 	}
 	// Button Handler
 	switch(last_input){
@@ -1395,14 +1459,14 @@ void fn_error_info(void){
 		glcd_tiny_draw_string(8,1,display_str);
 		sprintf(display_str,"to Report in Last");
 		glcd_tiny_draw_string(8,2,display_str);
-		sprintf(display_str,"%d Measurements", NBUFF_MEAS);
+		sprintf(display_str,"%d Measurements", N_MEASBUF);
 		glcd_tiny_draw_string(8,3,display_str);
-		}else{
+	}else{
 		temp_buf_ind = shot_list[shot_list_ind];
-		sprintf(display_str,"Measurement %d", data_buf[temp_buf_ind].index_ref);
+		sprintf(display_str,"Measurement %d", measBuf[temp_buf_ind].refIndex);
 		glcd_tiny_draw_string(0,1,display_str);
-		for (i=0;i<min(5, data_buf[temp_buf_ind].num_errors); i++){
-			gen_err_message(display_str, &data_buf[temp_buf_ind], i);
+		for (i=0;i<MAX_ERRORS; i++){
+			gen_err_message(display_str, &measBuf[temp_buf_ind], i);
 			glcd_tiny_draw_string(0,i+2,display_str);
 		}
 		
@@ -1413,90 +1477,48 @@ void fn_error_info(void){
 
 
 void fn_menu1(void){
-	
+	uint8_t i;
+	const enum STATE gotoList[] = {st_set_options, 
+		st_error_info, 
+		st_menu_cal, 
+		st_set_clock, 
+		st_menu_BLE, 
+		st_menu_debug};
+	const char * labels[] = {
+		"Options",
+		"Error Info",
+		"Calibration",
+		"Set Clock",
+		"Bluetooth",
+		"Debug Menu",
+	};
+		
 	if (state_change){
-		cur_Y=1;
-		cur_Y_low=1;
-		cur_Y_high=6;
-		last_input = input_none;
+		curY = 0;
+		curY_N = 6;
+		curY_off = 1;
 	}
-	
-	
-	glcd_clear_buffer();
 	
 	//  Button Handler
-	switch(last_input){
-		case input_button2:
-			if(cur_Y > cur_Y_low){--cur_Y; }
-			break;
-		case input_button3:
-			if(cur_Y < cur_Y_high){++cur_Y; }
-			break;
-		case input_button1:
-			if(cur_Y == 1){ // Options
-				current_input = input_set_units;
-			} else if (cur_Y==2){// Error Info
-				current_input = input_error_info;
-			} else if (cur_Y==3){ // Calibration
-				current_input = input_cal_menu;
-			} else if (cur_Y==4){ // Set Clock
-				current_input = input_set_clock;
-			} else if (cur_Y==5){ //  Bluetooth
-				current_input = input_set_bluetooth;
-			} else if (cur_Y==6){ // Debug
-				current_input = input_menu_debug;
-			}
-			break;
-		default:
-			break;
+	curY = getCursor(last_input, curY, curY_N);
+	if (last_input==input_button1){
+		current_state = gotoList[curY];
 	}
 	
+	
+	glcd_clear_buffer();	
 	//  Title
-	sprintf(display_str, "Menu:");
-	glcd_tiny_draw_string(0,0,display_str);
+	sprintf(display_str, "Main Menu:");
+	glcd_tiny_draw_string(0, 0,display_str);
 	//print soft key text
 	drawSoftKeys("Enter","<",">","Back");
-	
-	//  Write menu entries
-	sprintf(display_str, "Options");
-	glcd_tiny_draw_string(10,1,display_str);
-	
-	sprintf(display_str, "Error Info");
-	glcd_tiny_draw_string(10,2,display_str);
-	
-	sprintf(display_str, "Calibration");
-	glcd_tiny_draw_string(10,3,display_str);
-	
-	sprintf(display_str, "Set Clock");
-	glcd_tiny_draw_string(10,4,display_str);
-	
-	sprintf(display_str, "Bluetooth");
-	glcd_tiny_draw_string(10,5,display_str);
-	
-	sprintf(display_str, "Debug Menu");
-	glcd_tiny_draw_string(10,6,display_str);
-	
-	
+	//print cursor
 	sprintf(display_str, ">");
-	glcd_tiny_draw_string(3, cur_Y,display_str);
-	
-	
-	//debug//////////////
-	#if DEBUG_DISPLAY==true
-	debug1++;
-	sprintf(display_str,"debug1:%d", debug1);
-	glcd_tiny_draw_string(0,3,display_str);
-	sprintf(display_str,"debug2:%d", debug2);
-	glcd_tiny_draw_string(0,4,display_str);
-	sprintf(display_str,"debug3:%d", debug3);
-	glcd_tiny_draw_string(0,5,display_str);
-	sprintf(display_str,"debug4:%d", debug4);
-	glcd_tiny_draw_string(0,6,display_str);
-	#endif
-	////////////////////////
-	
-	
-	
+	glcd_tiny_draw_string(0, curY+curY_off,display_str);
+	//  Draw Options
+	for (i=0;i<curY_N;i++){
+		glcd_tiny_draw_string(5,i+curY_off,labels[i]);
+	}
 	glcd_write();
 	
 	
@@ -1507,67 +1529,51 @@ void fn_menu1(void){
 
 
 void fn_menu_debug(void){
-	//  Set initial conditions
+	uint8_t i;
+	const enum STATE gotoList[] = {st_debug_rawData,
+		 st_debug_backlight, 
+		 st_debug_charger, 
+		 st_process_inc_azm_full_cal,
+		 st_process_azm_quick_cal,
+		 st_firmware
+		 };
+		 
+	const char * labels[] = {
+		"Sensor Raw Data",
+		"Backlight Manual",
+		"Charger Info",
+		"Reprocess Full Cal",
+		"Reprocess AZM Cal",
+		"Firmware"
+	};
+		 
+	//  Set initial conditions	 
 	if (state_change) {
-		cur_Y = 2;
-		cur_Y_low = 2;
-		cur_Y_high = 6;
+		curY = 0;
+		curY_N = 6;
+		curY_off = 1;
 	}
 	
 	// Button Handler
-	switch(last_input){
-		case input_button2:
-			if(cur_Y > cur_Y_low){--cur_Y; }
-			break;
-		case input_button3:
-			if(cur_Y < cur_Y_high){++cur_Y; }
-			break;
-		case input_button1:
-			if (cur_Y==2){
-				//  Raw Data Debug
-				current_input = input_debug_rawData;
-			}else if(cur_Y == 3){
-				//  Backlight Debug
-				current_input = input_debug_backlight;
-			} else if(cur_Y == 4){
-				//  Charger Debug
-				current_input = input_debug_charger;
-			}else if(cur_Y == 5){
-				//  Charger Debug
-				current_input = input_reprocess_inc_azm_cal;
-			}else if(cur_Y == 6){
-				//  Charger Debug
-				current_input = input_reprocess_azm_quick_cal;
-			}
-		default:
-			break;
+	curY = getCursor(last_input, curY, curY_N);
+	if (last_input==input_button1){
+		current_state = gotoList[curY];
 	}
-	
+		
 	// Display
 	glcd_clear_buffer();
 	//  Display Title
 	sprintf(display_str,"Debug Menu:");
 	glcd_tiny_draw_string(0,0,display_str);
-	
-	//Display Options
-	sprintf(display_str, "Sensor Raw Data");
-	glcd_tiny_draw_string(5, 2, display_str);
-	sprintf(display_str, "Backlight Manual");
-	glcd_tiny_draw_string(5, 3, display_str);
-	sprintf(display_str, "Charger Info");
-	glcd_tiny_draw_string(5, 4, display_str);
-	sprintf(display_str, "Reprocess Full Cal");
-	glcd_tiny_draw_string(5, 5, display_str);
-	sprintf(display_str, "Reprocess AZM Cal");
-	glcd_tiny_draw_string(5, 6, display_str);
-	
 	// Display soft keys
 	drawSoftKeys("Enter","<",">","Back");
-	
 	//Display Pointer
 	sprintf(display_str, ">");
-	glcd_tiny_draw_string(0, cur_Y,display_str);
-	
+	glcd_tiny_draw_string(0, curY+curY_off,display_str);
+	// Draw menu options
+	for(i=0;i<curY_N;i++){
+		glcd_tiny_draw_string(5, i+curY_off, labels[i]);
+	}
 	glcd_write();
 	
 	
@@ -1576,60 +1582,31 @@ void fn_menu_debug(void){
 
 
 void fn_menu_cal(void){
+	uint8_t i;
+	const enum STATE gotoList[] = {st_disp_cal_report,
+		st_loop_test,
+		st_azm_quick_calibration,
+		st_inc_azm_full_calibration,
+		st_dist_calibration};
+	const char * labels[] = {
+		"Display Report",
+		"Loop Test",
+		"CAL: Quick AZM",
+		"CAL: Full INC&AZM",
+		"CAL: Range-finder",
+	};
+		
 	//  Set initial conditions
 	if (state_change) {
-		cur_Y = 1;
-		cur_Y_low = 1;
-		cur_Y_high = 5;
+		curY = 0;
+		curY_N = 5;
+		curY_off = 1;
 	}
 	
 	// Button Handler
-	switch(last_input){
-		case input_button2:
-			if(cur_Y > cur_Y_low){--cur_Y; }
-			break;
-		case input_button3:
-			if(cur_Y < cur_Y_high){++cur_Y; }
-			break;
-		case input_button1:
-			switch (cur_Y){
-				case 1:
-					//  Display Report
-					current_input = input_disp_cal_report;
-					break;
-				case 2:
-					// Perform Loop Test
-					current_input = input_loop_test;
-					break;
-				case 3:
-					//  Perform Compass Quick Cal
-					current_input = input_azm_quick_calibration;
-					break;
-				case 4:
-					//  Accelerometer and Compass Calibration
-					current_input = input_inc_azm_full_calibration;
-					break;
-				case 5:
-					//  Distance Calibration
-					current_input = input_dist_calibration;
-					break;
-					
-				
-				
-				
-			}
-			if (cur_Y==2){
-				
-			}else if(cur_Y == 3){
-				
-				
-			} else if (cur_Y==4){
-				
-			} else if (cur_Y==5){
-				
-			}
-		default:
-			break;
+	curY = getCursor(last_input, curY, curY_N);
+	if (last_input==input_button1){
+		current_state = gotoList[curY];
 	}
 	
 	// Display
@@ -1637,26 +1614,16 @@ void fn_menu_cal(void){
 		//  Display Title
 	sprintf(display_str,"Calibration:");
 	glcd_tiny_draw_string(0,0,display_str);
-	
-	//Display Options
-	sprintf(display_str, "Display Report");
-	glcd_tiny_draw_string(5, 1, display_str);
-	sprintf(display_str, "Loop Test");
-	glcd_tiny_draw_string(5, 2, display_str);
-	sprintf(display_str, "CAL: Quick AZM");
-	glcd_tiny_draw_string(5, 3, display_str);
-	sprintf(display_str,"CAL: Full INC&AZM");
-	glcd_tiny_draw_string(5, 4, display_str);
-	sprintf(display_str,"CAL: Range-finder");
-	glcd_tiny_draw_string(5, 5, display_str);
-	
 	// Display soft keys
 	drawSoftKeys("Enter","<",">","Back");
-
 	//Display Pointer
 	sprintf(display_str, ">");
-	glcd_tiny_draw_string(0, cur_Y,display_str);
-	
+	glcd_tiny_draw_string(0, curY+curY_off,display_str);
+	//Display Options
+	for (i=0;i<curY_N;i++){	
+		glcd_tiny_draw_string(5, i+curY_off, labels[i]);
+	}
+
 	glcd_write();
 	
 }
@@ -1666,15 +1633,15 @@ void fn_debug_backlight(void){
 	static struct BACKLIGHT_COLOR *colorPtr;
 	//  Set initial conditions
 	if (state_change) {
-		cur_Y = 2;
-		cur_Y_low = 2;
-		cur_Y_high = 4;
+		curY = 0;
+		curY_N = 3;
+		curY_off = 2;
 		options.backlight_setting.colorRef = 0;//  0 is custom Color
 		backlightOn(&options.backlight_setting);
 		//colorPtr = backlightCustomAdjust(0, 0);
 	}	
 	
-	switch(cur_Y){
+	switch(curY){
 		case 2:
 			colorChar = 'r';
 			break;
@@ -1692,23 +1659,17 @@ void fn_debug_backlight(void){
 	}	
 	
 	// Button Handler
+	curY = getCursor(last_input, curY, curY_N);
 	switch(last_input){
 		case input_button1:
-			if(cur_Y > cur_Y_low){--cur_Y; }
-			break;
-		case input_button4:
-			if(cur_Y < cur_Y_high){++cur_Y; }
-			break;
-		case input_button2:
 			colorPtr = backlightCustomAdjust(colorChar, 1);
 			break;
-		case input_button3:
+		case input_button4:
 			colorPtr = backlightCustomAdjust(colorChar, -1);
 			break;
 		default:
 			break;
-	}
-	
+	}	
 
 	
 	// Display
@@ -1719,18 +1680,18 @@ void fn_debug_backlight(void){
 	
 	//Display Options
 	sprintf(display_str, "Red:   %d", colorPtr->red);
-	glcd_tiny_draw_string(20, 2, display_str);
+	glcd_tiny_draw_string(5, 2, display_str);
 	sprintf(display_str, "Green: %d", colorPtr->green);
-	glcd_tiny_draw_string(20, 3, display_str);
+	glcd_tiny_draw_string(5, 3, display_str);
 	sprintf(display_str, "Blue:  %d", colorPtr->blue);
-	glcd_tiny_draw_string(20, 4, display_str);
+	glcd_tiny_draw_string(5, 4, display_str);
 	
 	// Display soft keys
 	drawSoftKeys("","Up","Down","");
 	
 	//Display Pointer
 	sprintf(display_str, ">");
-	glcd_tiny_draw_string(10, cur_Y,display_str);
+	glcd_tiny_draw_string(0, curY_off,display_str);
 	
 	glcd_write();
 	
@@ -1742,68 +1703,63 @@ void fn_debug_backlight(void){
 void fn_set_options(void){
 	//  Set initial conditions
 	if (state_change) {
-		cur_Y = 1;
-		cur_Y_low = 1;
-		cur_Y_high = 7;
+		curY = 0;
+		curY_N = 7;
+		curY_off = 1;
 	}
 	
 	// Button Handler
-	switch(last_input){
-		case input_button2:
-			if(cur_Y > cur_Y_low){--cur_Y; }
+	curY = getCursor(last_input, curY, curY_N);
+	if (last_input==input_button1){
+		switch (curY){
+			case 0:
+			//  Distance Units
+			if (options.current_unit_dist == feet){ options.current_unit_dist = meters;}
+			else{options.current_unit_dist = feet;}
+			save_user_settings();
 			break;
-		case input_button3:
-			if(cur_Y < cur_Y_high){++cur_Y; }
+			case 1:
+			//  Distance Units
+			if (options.current_unit_temp == celsius){ options.current_unit_temp = fahrenheit;}
+			else{options.current_unit_temp = celsius;}
+			save_user_settings();
 			break;
-		case input_button1:
-			switch (cur_Y){
-				case 1:
-					//  Distance Units
-					if (options.current_unit_dist == feet){ options.current_unit_dist = meters;}
-					else{options.current_unit_dist = feet;}
-					save_user_settings();
-					break;
-				case 2:
-					//  Distance Units
-					if (options.current_unit_temp == celsius){ options.current_unit_temp = fahrenheit;}
-					else{options.current_unit_temp = celsius;}
-					save_user_settings();
-					break;
-				case 3:
-					// Shot Delay
-					options.shot_delay = options.shot_delay+1;
-					if (options.shot_delay>SHOT_DELAY_MAX){options.shot_delay = 0;}
-					save_user_settings();
-					break;
-				case 4:
-					// Charge Current
-					if (options.chargeCurrent == 500){ options.chargeCurrent = 100;}
-					else{options.chargeCurrent = 500;}
-					setChargeCurrent(options.chargeCurrent);
-					save_user_settings();
-					break;
-				case 5:
-					// Charge Current
-					adjustErrorSensitivity();
-					save_user_settings();
-					break;	
-				case 6:
-					// Backlight Color
-					backlightColorToggle(&options.backlight_setting);					
-					save_user_settings();
-					break;
-				case 7:
-					// Backlight Color
-					backlightLevelToggle(&options.backlight_setting);
-					save_user_settings();
-					break;
-				default:
-					break;
-			}
-		default:
-		break;	
-
+			case 2:
+			// Shot Delay
+			options.shot_delay = options.shot_delay+1;
+			if (options.shot_delay>SHOT_DELAY_MAX){options.shot_delay = 0;}
+			save_user_settings();
+			break;
+			case 3:
+			// Charge Current
+			if (options.chargeCurrent == 500){ options.chargeCurrent = 100;}
+			else{options.chargeCurrent = 500;}
+			setChargeCurrent(options.chargeCurrent);
+			save_user_settings();
+			break;
+			case 4:
+			// Charge Current
+			adjustErrorSensitivity();
+			save_user_settings();
+			break;
+			case 5:
+			// Backlight Color
+			backlightColorToggle(&options.backlight_setting);
+			save_user_settings();
+			break;
+			case 6:
+			// Backlight Color
+			backlightLevelToggle(&options.backlight_setting);
+			save_user_settings();
+			break;
+			default:
+			break;
+		}
+		
 	}
+	
+			
+
 	
 	// Display
 	glcd_clear_buffer();
@@ -1841,123 +1797,167 @@ void fn_set_options(void){
 	
 	//Display Pointer
 	sprintf(display_str, ">");
-	glcd_tiny_draw_string(0, cur_Y,display_str);
+	glcd_tiny_draw_string(0, curY+curY_off,display_str);
 		
-	
-	//debug//////////////
-	#if DEBUG_DISPLAY==true
-	debug1++;
-	sprintf(display_str,"debug1:%d", debug1);
-	glcd_tiny_draw_string(0,3,display_str);
-	sprintf(display_str,"debug2:%d", debug2);
-	glcd_tiny_draw_string(0,4,display_str);
-	sprintf(display_str,"debug3:%d", debug3);
-	glcd_tiny_draw_string(0,5,display_str);
-	sprintf(display_str,"debug4:%d", debug4);
-	glcd_tiny_draw_string(0,6,display_str);
-	#endif
-	////////////////////////	
-		
-		
+
 	glcd_write();
 
 
 	
 }
 
-
-
-void fn_set_bluetooth(void){
-	char str_on[] = "On";
-	char str_off[] = "Off";
-	char *str_ptr;
-	bool pinState;
+void fn_debug_BLE(void){
+	bool pinState, doAction;
+	bool debugPinState1,debugPinState2, debugPinState3;
+	uint8_t i;
+	char addStr[10];
 	
 	if (state_change) {
-		cur_Y=2;
-		cur_Y_low=2;
-		cur_Y_high=6;
-		last_input = input_none;
-		
+		curY=0;
+		curY_N=3;
+		curY_off=1;
 	}
 	
-	switch(last_input){
-		case input_button2:
-			if(cur_Y > cur_Y_low){--cur_Y; }
-			break;
-		case input_button3:
-			if(cur_Y < cur_Y_high){++cur_Y; }
-			break;
-		case input_button1:
-			if(cur_Y == 2){
-				pinState = ioport_get_pin_level(BLE_autorun);
-				ioport_set_pin_level(BLE_autorun, !pinState);
-			} else if (cur_Y==3){
-				pinState = ioport_get_pin_level(BLE_reset);
-				ioport_set_pin_level(BLE_reset, !pinState);
-			} else if (cur_Y==4){
-				pinState = ioport_get_pin_level(BLE_ota);
-				ioport_set_pin_level(BLE_ota, !pinState);		
-			} else if (cur_Y==5){
-				if (isBleCommEnabled()){
-					usart_disable(&usart_BLE);
-					BLE_usart_isolate();
-				}else{
-					configure_usart_BLE();
-				}
-				
-			}else if (cur_Y==6){
-				pinState = ioport_get_pin_level(BLE_COMMAND_MODE);
-				ioport_set_pin_level(BLE_COMMAND_MODE, !pinState);
-			}
-		default:
-			break;
-	}
-
-
+	
+	curY = getCursor(last_input, curY, curY_N);
 	
 	glcd_clear_buffer();
 	//  Display Title
-	sprintf(display_str,"Bluetooth:");
+	sprintf(display_str,"BLE Advanced:");
 	glcd_tiny_draw_string(0,0,display_str);
-	
-	//Display Options
-	sprintf(display_str,"AutoRun On/Off");
-	glcd_tiny_draw_string(25, 2, display_str);
-	sprintf(display_str,"Reset On/Off");
-	glcd_tiny_draw_string(25, 3, display_str);
-	sprintf(display_str,"OTA On/Off");
-	glcd_tiny_draw_string(25, 4, display_str);
-	sprintf(display_str,"MC UART On/Off");
-	glcd_tiny_draw_string(25, 5, display_str);
-	sprintf(display_str,"CMD MODE");
-	glcd_tiny_draw_string(25, 6, display_str);
+	//Cycle through all entries
+	for (i=0;i<curY_N;i++){
+		if ((curY==i) && (last_input==input_button1)){
+			doAction = true;
+		}else{
+			doAction = false;
+		}
+		switch (i){
+			//  BLE Reset
+			case 0:
+				strcpy(display_str,"RST to AT Mode ");
+				if (doAction){
+					//  Reset to AT Mode
+					BLE_reset_to_AT_mode();
+					strcpy(addStr,"RST");
+				}else{
+					strcpy(addStr,"");
+				}
+				break;
+			//  BLE Module Mode
+			case 1:
+				strcpy(display_str,"RST to Run Mode");
+				if (doAction){
+					BLE_init();
+					strcpy(addStr,"RST");
+				}else{
+					strcpy(addStr,"");
+				}
+				break;
+			//  BLE Communication Mode
+			case 2:
+				strcpy(display_str,"Curr Comm: ");
+
+				if (isBleCommEnabled()){
+					strcpy(addStr,"CPU");
+				}else{
+					strcpy(addStr,"TERM");
+				}
+				break;
+		}//  End switch for each level
+		//  Write entry
+		strcat(display_str, addStr);
+		glcd_tiny_draw_string(5, i+curY_off,display_str);
+	}
 	
 	// Display soft keys
 	drawSoftKeys("Adjust","<",">","Back");
 	
 	//Display Pointer
 	sprintf(display_str, ">");
-	glcd_tiny_draw_string(18, cur_Y,display_str);
-			
-	//Display Status
-	if (ioport_get_pin_level(BLE_autorun)){ str_ptr = str_off;}
-	else{ str_ptr = str_on;}
-	glcd_tiny_draw_string(0, 2,str_ptr);
-	if (ioport_get_pin_level(BLE_reset)){ str_ptr = str_off;}
-	else{str_ptr = str_on;}
-	glcd_tiny_draw_string(0, 3,str_ptr);
-	if (ioport_get_pin_level(BLE_ota)){ str_ptr = str_on;}
-	else{str_ptr = str_off;}
-	glcd_tiny_draw_string(0, 4,str_ptr);
-	if (isBleCommEnabled()){ str_ptr = str_on;}
-	else{str_ptr = str_off;}
-	glcd_tiny_draw_string(0, 5,str_ptr);
-	if (ioport_get_pin_level(BLE_COMMAND_MODE)){ str_ptr = str_on;}
-	else{str_ptr = str_off;}
-	glcd_tiny_draw_string(0, 6,str_ptr);
+	glcd_tiny_draw_string(0, curY+curY_off,display_str);
 	
+	
+	
+	//print BLE buffer
+	glcd_draw_rect(0, 32, 104, 32,BLACK);
+	print_Buff_to_Box(debugBuff, debugBuffIndex, 3, 33, 19, 3);
+	
+	glcd_write();
+	
+}
 
+void fn_menu_BLE(void){
+	char addStr[10];
+	bool doAction;
+	uint32_t i;
+	
+	if (state_change) {
+		curY=0;
+		curY_N=2;
+		curY_off=6;
+	}
+	
+	curY = getCursor(last_input, curY, curY_N);
+		
+	glcd_clear_buffer();
+	//  Display Title
+	sprintf(display_str,"Bluetooth:");
+	glcd_tiny_draw_string(0,0,display_str);
+	
+	for(i=0;i<curY_N;i++){
+		if((last_input==input_button1)&&(curY==i)){
+			doAction=true;
+			}
+		else{
+			doAction = false;
+			}
+		
+		switch (i){
+			//  BLE reset
+			case 0:
+			sprintf(display_str,"Reset BLE");
+			if(doAction){
+				BLE_init();
+				sprintf(addStr," RST...");
+			}else{
+				sprintf(addStr,"");
+			}			
+			break;
+			
+			
+			case 1:
+			sprintf(display_str,"Advanced Menu");
+			if(doAction){
+				current_state=st_debug_BLE;
+			}
+			break;	
+			
+		}//  Loop for each entry
+		//  Write entry
+		strcat(display_str, addStr);
+		glcd_tiny_draw_string(5, i+curY_off,display_str);
+		
+	}
+
+	// Display soft keys
+	drawSoftKeys("Adjust","<",">","Back");
+	
+	//Display Pointer
+	sprintf(display_str, ">");
+	glcd_tiny_draw_string(0, curY+curY_off,display_str);
+	
+	//  Display device name
+	BLE_get_device_name();
+	sprintf(display_str,"Name:%s", BleDeviceName);		
+	glcd_tiny_draw_string(0, 1,display_str);
+	// Display device address
+	BLE_get_device_MAC();
+	glcd_tiny_draw_string(0, 2,"MAC Address:");
+	glcd_tiny_draw_string(10, 3,BleDeviceMAC);
+	// Connected to
+	glcd_tiny_draw_string(0, 4,"Connected To:");
+	glcd_tiny_draw_string(10, 5,BleClientMAC);
 	
 	glcd_write();
 	
@@ -1965,79 +1965,81 @@ void fn_set_bluetooth(void){
 
 
 void fn_set_clock(void){
-	uint8_t i, unitMax, unitMin;
-	uint8_t *unitPtr;
-	// Used for setting clock
-	typedef struct {
-		uint8_t y_pos;//cursor y position
-		uint8_t min;  //unit max
-		uint8_t max;  //unit min
-		uint8_t *ptr; //unit location
-	} CLOCK_SETTING;
-	
-	CLOCK_SETTING clock_table[] = {
-		{1,	0,	99, &temp_time.year},
-		{2,	1,	12, &temp_time.month},
-		{3,	1,	31, &temp_time.date},
-		{4,	0,	24, &temp_time.hours},
-		{5,	0,	59, &temp_time.minutes},
-		{6,	0,	59, &temp_time.seconds}
-	};
-	
+	uint8_t adjustment;
+	static struct TIME tempTime;	
 	
 	if (state_change) {
-		cur_Y = 1;
-		cur_Y_low = 1;
-		cur_Y_high = 6;
+		curY = 0;
+		curY_N = 6;
+		curY_off = 1;
 		get_time();
-		memcpy(&temp_time,&current_time,sizeof(current_time));	
+		memcpy(&tempTime,&current_time,sizeof(current_time));	
+		//  Set seconds to zero
+		tempTime.seconds = 0;
 	}
-	
-	for (i=0;i<6;i++){
-		if (cur_Y==clock_table[i].y_pos){
-			unitMax = clock_table[i].max;
-			unitMin = clock_table[i].min;
-			unitPtr = clock_table[i].ptr;
-			break;
-		}
-	}
-	
-	
-	
+
+	// Button Handler
+	adjustment = 0;
 	switch(last_input){
 		case input_button2:
-			*unitPtr = incBcdData(*unitPtr, 1, unitMin, unitMax);
+			adjustment = 1;
 			break;
 		case input_button3:
-			*unitPtr = incBcdData(*unitPtr, -1, unitMin, unitMax);
+			adjustment = -1;
 			break;
 		case input_button1:
-			if(cur_Y >= cur_Y_high){
-				set_time();
-				current_input = input_state_complete;
-				}
-			else{++cur_Y;}
+			if((curY+1) >= curY_N){
+				//  Done, set time and exit
+				set_time(&tempTime);
+				current_state = st_menu1;
+			}else{
+				curY++;
+			}
 			break;
 		default:
 			break;
-			//  input_button4 aborts t
+		//  input_button4 aborts
 	}
+	
+	//  Time Adjustment
+	switch(curY){
+		case 0:
+			tempTime.year = incDecData(tempTime.year, adjustment, 2000, 2099);
+			break;
+		case 1:
+			tempTime.month = incDecData(tempTime.month, adjustment, 1, 12);
+			break;
+		case 2:
+			tempTime.day = incDecData(tempTime.day, adjustment, 1, 31);
+			break;
+		case 3:
+			tempTime.hours = incDecData(tempTime.hours, adjustment, 0, 23);
+			break;
+		case 4:
+			tempTime.minutes = incDecData(tempTime.minutes, adjustment, 0, 59);
+			break;
+		case 5:
+			tempTime.seconds = incDecData(tempTime.seconds, adjustment, 0, 59);
+			break;
+
+	}
+	
 	
 	glcd_clear_buffer();
 	
 	sprintf(display_str,"Set Clock:");
 	glcd_tiny_draw_string(0,0,display_str);
-	sprintf(display_str,"Year:   20%02x", temp_time.year);
+	sprintf(display_str,"Year:   %04d", tempTime.year);
 	glcd_tiny_draw_string(10,1,display_str);
-	sprintf(display_str,"Month:  %02x", temp_time.month);
+	sprintf(display_str,"Month:  %02d", tempTime.month);
 	glcd_tiny_draw_string(10,2,display_str);
-	sprintf(display_str,"Date:   %02x", temp_time.date);
+	sprintf(display_str,"Date:   %02d", tempTime.day);
 	glcd_tiny_draw_string(10,3,display_str);
-	sprintf(display_str,"Hour:   %02x", temp_time.hours);
+	sprintf(display_str,"Hour:   %02d", tempTime.hours);
 	glcd_tiny_draw_string(10,4,display_str);
-	sprintf(display_str,"Minute: %02x", temp_time.minutes);
+	sprintf(display_str,"Minute: %02d", tempTime.minutes);
 	glcd_tiny_draw_string(10,5,display_str);
-	sprintf(display_str,"Second: %02x", temp_time.seconds);
+	sprintf(display_str,"Second: %02d", tempTime.seconds);
 	glcd_tiny_draw_string(10,6,display_str);
 	
 	// Display soft keys
@@ -2045,7 +2047,7 @@ void fn_set_clock(void){
 	
 	//Display Pointer
 	sprintf(display_str, ">");
-	glcd_tiny_draw_string(1, cur_Y,display_str);
+	glcd_tiny_draw_string(1, curY+curY_off,display_str);
 	
 	glcd_write();
 		
@@ -2055,163 +2057,49 @@ void fn_set_clock(void){
 
 
 void fn_main_display(void){
+
+	struct MEASUREMENT_FULL measTemp;
+	
+	//Handle Button Inputs
+	
+	switch (last_input){
+		case input_button2:
+			backlightPlus(&options.backlight_setting);
+			save_user_settings();
+			break;
+		case input_button3:
+			backlightMinus(&options.backlight_setting);
+			save_user_settings();
+			break;
+		case input_buttonE:
+			if (isLaserOn()){
+				//  Laser already on, take measurement
+				full_measurement(&measTemp, options.shot_delay, measRegular);
+				rangefinder_on_off(false);
+				//processMeasurement(&measTemp);	
+			}else{
+				//  Turn on laser for measuring
+				rangefinder_on_off(true);
+				laser_on_off(true);
+				
+			}		
+			break;
+		default:
+			break;
+	}
+	
+	if (isLaserOn()){
+		//  If laser is on, take a measurement for display
+		struct MEASUREMENT_FULL tempMeas;
+		quick_measurement(&tempMeas);
+		//memcpy(&measBuf[measBufInd],&tempMeas,sizeof(measBuf[measBufInd]));
+		//copyMeasurement(&measBuf[measBufInd], &tempMeas);
+		
+	}
 	
 	print_data_screen();
 	
 	
-	//Handle Button Inputs
-	if(last_input==input_button2){
-		backlightPlus(&options.backlight_setting);
-		save_user_settings();
-	}else if(last_input==input_button3){
-		backlightMinus(&options.backlight_setting);
-			save_user_settings();
-	}
-	
-}
-
-void print_data_screen(void){
-	static bool flipper;
-	
-	get_time();
-	isCharging = getChargerStatus();
-	
-	glcd_clear_buffer();
-	
-	if (options.current_unit_temp == fahrenheit){
-		sprintf(display_str,"T:%4.1fF", current_time.temperatureF);
-	}else{
-		sprintf(display_str,"T:%0.1fC", current_time.temperatureC);
-	}
-	
-	glcd_tiny_draw_string(86,7,display_str);
-	
-	sprintf(display_str,"%02x:%02x:%02x", current_time.hours, current_time.minutes, current_time.seconds);
-	glcd_tiny_draw_string(0,7,display_str);
-
-
-	
-	//  Draw Charge Status	
-	if (isCharging){
-		flipper = !flipper;
-		//if (flipper){
-		//	flipper = false;
-		//}else{
-		//	flipper = true;
-		//}
-		//  Draw lines
-		glcd_draw_line(49, 64, 49, 54, BLACK);
-		glcd_draw_line(49, 54, 83, 54, BLACK);
-		glcd_draw_line(83, 64, 83, 54, BLACK);
-		
-			
-	}else{
-		flipper = true;
-	}
-	if (flipper){
-		sprintf(display_str,"B:%02d%%", getBatteryLevel());		
-	}else{
-		sprintf(display_str,"B:%02d", getBatteryLevel());
-	}
-	glcd_tiny_draw_string(51,7,display_str);
-	
-	#define x1 0  //  Starting X position for Ref data
-	#define x2 28 //  Starting X position for Distance data
-	#define x3 63 //  Starting X position for Azimuth data
-	#define x4 98 //  Starting X position for Inclination data
-	#define y1 0  //  Starting Y position for header
-	#define y2 10 //  Starting Y position for data
-	
-	#define num_lines 5
-	//Print Data Headers
-	sprintf(display_str,"REF");
-	glcd_draw_string_xy(x1,y1, display_str);
-	
-	sprintf(display_str,"DIST");
-	glcd_draw_string_xy(x2,y1,display_str);
-	
-	sprintf(display_str,"AZM");
-	glcd_draw_string_xy(x3, y1, display_str);
-	glcd_draw_circle(x3+21, y1+2, 2, BLACK);
-
-	sprintf(display_str,"INCL");
-	glcd_draw_string_xy(x4, y1, display_str);
-	glcd_draw_circle(x4+26, y1+2, 2, BLACK);
-
-	//Print Grid Lines
-	glcd_draw_line(0, y1+8, 128, y1+8, BLACK);
-	glcd_draw_line(0, y2+8, 128, y2+8, BLACK);
-	glcd_draw_line(x2-2, 0, x2-2, 53, BLACK);
-	glcd_draw_line(x3-2, 0, x3-2, 53, BLACK);
-	glcd_draw_line(x4-2, 0, x4-2, 53, BLACK);
-	
-	//Print Data
-	uint16_t i;
-	uint16_t y_temp;
-	int16_t temp_index;
-	int16_t temp_ref;
-	for (i=0;i<num_lines;i++){
-		temp_index=data_buf_ind-i;
-		temp_ref=data_ref-i;
-		if(current_state==st_aim){//bump everything down to display active reading
-			temp_index=temp_index+1;
-			temp_ref=temp_ref+1;
-		}
-		//Set index for buffer wrap-around
-		if (temp_index<0){
-			temp_index = NBUFF_MEAS+temp_index;
-			}else if(temp_index>=NBUFF_MEAS){
-			temp_index = temp_index-NBUFF_MEAS;
-		}
-		//print lines
-		if ((temp_ref)>0){
-			//Adjust line spacing for grid lines
-			if(i<2){y_temp=y2+10*i;}
-			else {y_temp=y2+9*i;	}
-			if((current_state==st_main_display)||(i>0)){//do not print reference and distance for active reading
-				sprintf(display_str, "%d", data_buf[temp_index].index_ref);//reference
-				glcd_draw_string_xy(x1, y_temp, display_str);
-				sprintf(display_str, "%.1f", data_buf[temp_index].distCal);//distance
-				glcd_draw_string_xy(x2, y_temp, display_str);
-				
-				//  Add Error message if necessary
-				if (data_buf[temp_index].num_errors!=0){
-					glcd_draw_string_xy(x1+18, y_temp, "E");				
-				}
-				
-			}
-
-			sprintf(display_str, "%.1f", data_buf[temp_index].azimuth);//Azimuth
-			glcd_draw_string_xy(x3, y_temp, display_str);
-			sprintf(display_str, "%.1f", data_buf[temp_index].inclination);//Inclination
-			glcd_draw_string_xy(x4, y_temp, display_str);
-		}
-
-	}
-	//debug//////////////
-	#if DEBUG_DISPLAY==true
-	debug1++;
-	sprintf(display_str,"debug1:%d", debug1);
-	glcd_tiny_draw_string(0,3,display_str);
-	sprintf(display_str,"debug2:%d", debug2);
-	glcd_tiny_draw_string(0,4,display_str);
-	sprintf(display_str,"debug3:%d", debug3);
-	glcd_tiny_draw_string(0,5,display_str);
-	sprintf(display_str,"debug4:%d", debug4);
-	glcd_tiny_draw_string(0,6,display_str);
-	#endif
-	////////////////////////
-
-	
-	glcd_write();
-}
-
-
-void fn_aim_abort(void){
-	rangefinder_on_off(false);
-	ioport_set_pin_level(laser_reset, false);
-
-	current_input = input_state_complete;
 	
 }
 
@@ -2253,17 +2141,9 @@ void config_pins_powerup(void){
 	ioport_set_pin_level(mag2_SS, true);
 	ioport_set_pin_dir(SD_CS, IOPORT_DIR_OUTPUT);
 	ioport_set_pin_level(SD_CS, true);
-	//UART Pins
-	//ioport_set_pin_dir(MCU_RTS1, IOPORT_DIR_OUTPUT);
-	//ioport_set_pin_level(MCU_RTS1, false);
-	//ioport_set_pin_dir(MCU_CTS1, IOPORT_DIR_INPUT);
-	//BLE pins
-	//ioport_set_pin_dir(BLE_ota, IOPORT_DIR_OUTPUT);
-	//ioport_set_pin_level(BLE_ota, false);// low to disable programming over BLE
-	//ioport_set_pin_dir(BLE_autorun, IOPORT_DIR_OUTPUT);
-	//ioport_set_pin_level(BLE_autorun, true);//low for autorun enabled, high for development mode
-	//ioport_set_pin_dir(BLE_reset, IOPORT_DIR_OUTPUT);
-	//ioport_set_pin_level(BLE_reset, false); //low, hold in reset
+	//  Buzzer
+	ioport_set_pin_dir(BuzzerPin, IOPORT_DIR_OUTPUT);
+	ioport_set_pin_level(BuzzerPin, false);
 	//miscellaneous
 	ioport_set_pin_dir(laser_reset, IOPORT_DIR_OUTPUT);
 	ioport_set_pin_level(laser_reset, false);
@@ -2292,12 +2172,14 @@ void config_pins_powerdown(void){
 	ioport_reset_pin_mode(MCU_TX2);
 	ioport_reset_pin_mode(MCU_RX1);
 	ioport_reset_pin_mode(MCU_RX2);
+	ioport_reset_pin_mode(MCU_RTS1);
+	ioport_reset_pin_mode(MCU_CTS1);
 	ioport_set_pin_dir(MCU_TX1, IOPORT_DIR_INPUT);
-	//ioport_set_pin_dir(MCU_TX1, IOPORT_DIR_OUTPUT);
-	//ioport_set_pin_level(MCU_TX1, false);
 	ioport_set_pin_dir(MCU_TX2, IOPORT_DIR_INPUT);
 	ioport_set_pin_dir(MCU_RX1, IOPORT_DIR_INPUT);
 	ioport_set_pin_dir(MCU_RX2, IOPORT_DIR_INPUT);
+	ioport_set_pin_dir(MCU_RTS1, IOPORT_DIR_INPUT);
+	ioport_set_pin_dir(MCU_CTS1, IOPORT_DIR_INPUT);
 	//set all pins used on V2 devices to high impedance
 	ioport_set_pin_dir(lcd_SS , IOPORT_DIR_INPUT);
 	ioport_set_pin_dir(acc1_SS, IOPORT_DIR_INPUT);
@@ -2309,192 +2191,29 @@ void config_pins_powerdown(void){
 	ioport_set_pin_dir(LCD_SPI_SS_PIN , IOPORT_DIR_INPUT);
 	ioport_set_pin_dir(LCD_SPI_DC_PIN , IOPORT_DIR_INPUT);
 	ioport_set_pin_dir(LCD_SPI_RST_PIN , IOPORT_DIR_INPUT);
-	//ioport_set_pin_dir(BLE_autorun, IOPORT_DIR_INPUT);
-	//ioport_set_pin_dir(BLE_ota, IOPORT_DIR_INPUT);
-	//ioport_set_pin_dir(BLE_SS, IOPORT_DIR_INPUT);
-	//ioport_set_pin_level(BLE_reset, false);
-	ioport_set_pin_level(BLE_COMMAND_MODE, false);
+
 }
 
 
 
 
-void configure_extint_channel(void)
-{
-	struct extint_chan_conf config_extint_chan;
-
-	extint_chan_get_config_defaults(&config_extint_chan);
-	config_extint_chan.gpio_pin_pull      = EXTINT_PULL_UP;
-	config_extint_chan.detection_criteria = EXTINT_DETECT_FALLING;
-	config_extint_chan.filter_input_signal  = false;
-	config_extint_chan.enable_async_edge_detection = true;
-	// button 4
-	config_extint_chan.gpio_pin           = PIN_PA07A_EIC_EXTINT7;
-	config_extint_chan.gpio_pin_mux       = MUX_PA07A_EIC_EXTINT7;
-	extint_chan_set_config(7, &config_extint_chan);
-	// button 3
-	config_extint_chan.gpio_pin           = PIN_PA06A_EIC_EXTINT6;
-	config_extint_chan.gpio_pin_mux       = MUX_PA06A_EIC_EXTINT6;
-	extint_chan_set_config(6, &config_extint_chan);
-	// button 2
-	config_extint_chan.gpio_pin           = PIN_PA04A_EIC_EXTINT4;
-	config_extint_chan.gpio_pin_mux       = MUX_PA04A_EIC_EXTINT4;
-	extint_chan_set_config(4, &config_extint_chan);
-	// button 1
-	config_extint_chan.gpio_pin           = PIN_PB09A_EIC_EXTINT9;
-	config_extint_chan.gpio_pin_mux       = MUX_PB09A_EIC_EXTINT9;
-	extint_chan_set_config(9, &config_extint_chan);
-	
-	// button Ext
-	config_extint_chan.detection_criteria = EXTINT_DETECT_BOTH;
-	config_extint_chan.gpio_pin           = PIN_PA05A_EIC_EXTINT5;
-	config_extint_chan.gpio_pin_mux       = MUX_PA05A_EIC_EXTINT5;
-	extint_chan_set_config(5, &config_extint_chan);
-	
-}
-
-void configure_extint_callbacks(void)
-{
-	// Button 4
-	extint_register_callback(extint_routine, 7,	EXTINT_CALLBACK_TYPE_DETECT);
-	extint_chan_enable_callback(7,EXTINT_CALLBACK_TYPE_DETECT);
-	// Button 3
-	extint_register_callback(extint_routine, 6,	EXTINT_CALLBACK_TYPE_DETECT);
-	extint_chan_enable_callback(6,EXTINT_CALLBACK_TYPE_DETECT);
-	// Button 2
-	extint_register_callback(extint_routine, 4,	EXTINT_CALLBACK_TYPE_DETECT);
-	extint_chan_enable_callback(4,EXTINT_CALLBACK_TYPE_DETECT);
-	// Button 1
-	extint_register_callback(extint_routine, 9,	EXTINT_CALLBACK_TYPE_DETECT);
-	extint_chan_enable_callback(9,EXTINT_CALLBACK_TYPE_DETECT);
-	
-	// Button External
-	extint_register_callback(extint_routine, 5,	EXTINT_CALLBACK_TYPE_DETECT);
-	extint_chan_enable_callback(5,EXTINT_CALLBACK_TYPE_DETECT);
-}
-
-void extint_routine(void)
-{
-	static uint32_t last_time_ms;
-	uint32_t current_time_ms;
-	enum INPUT tempInput;
-	
-	//cpu_irq_disable();
-	
-	
-	current_time_ms = getCurrentMs(); 
-	
-	
-
-	switch (extint_get_current_channel()){
-		case 5:
-			tempInput = externalButtonRoutine(!ioport_get_pin_level(buttonE), current_time_ms);
-			break;
-		case 7:
-			tempInput = input_button4;
-			break;
-		case 6:
-			tempInput = input_button3;
-			break;
-		case 4:
-			tempInput = input_button2;
-			break;
-		case 9:
-			tempInput = input_button1;
-			break;
-		default:
-			tempInput = input_none;
-			break;
-	}// End switch for each input type
-	
-	
-	
-	//  Debounce Function
-	if(tempInput != input_none){
-		if((current_time_ms-last_time_ms)>DEBOUNCE_MS){
-			last_time_ms = current_time_ms;	
-			current_input = tempInput;
-		}
-	}
-	//cpu_irq_enable();
-	
-	
-}
-
-enum INPUT externalButtonRoutine(bool buttonOn, uint32_t current_time_ms){
-	// Button External
-	// Special Routines for External Button
-	// If held down for less than X seconds, provides normal input upon release
-	// If held down for more than X seconds, a separate interrupt routine provides powerdown input
-	// When in powerdown state, 3 quick clicks through a separate interrupt routine provides powerup input
-	static uint32_t last_time_ms;
-	
-	static uint8_t click_counter=0;
-	
-	
-	switch (current_state){
-		case st_powerup:
-			//  Ignore external button inputs during powerup
-			return input_none;
-			break;
-		case st_powerdown:
-			//  Special Routine to wake up from sleep
-			
-			//  Debounce function
-			//  Lower debounce time than normal
-			if ((current_time_ms-last_time_ms)<DEBOUNCE_MS_QUICK3){
-				return input_none;
-			}
-			
-			//  Find out if click counter will be incremented
-			if( (current_time_ms-last_time_ms)<QUICK3_MS){
-				//  Clicked within necessary time interval, add to click counter.
-				click_counter++;
-			}else{
-				//  Not fast enough, record as first click
-				click_counter = 1;
-			}
-			last_time_ms = current_time_ms;
-			
-			
-			//  See if enough clicks have occurred
-			if (click_counter>=3){
-				click_counter = 0;
-				return input_wakeup;
-				
-			}else{
-				return input_none;
-			}			
-			break;
-		default:
-			if (buttonOn){
-				//  Trigger on if button is pressed
-				if(!buttonE_triggered){
-					buttonE_triggered=true;
-					//trigger timer
-					timerStartExt();
-				}
-				return input_none;
-			}else{
-				//  Releaed in a short amount of time, normal input
-				buttonE_triggered=false;
-				timerStopExt();
-				return input_buttonE;
-			}
-
-	}//  End Switch Statement
-
-	
-		
-}
 
 
 
 void fn_powerdown(void){
 
 	if (state_change){
+		//  Save into EEPROM
+		save_sync_tracker();
+		
+		//  Turn off BLE advertising
+		BLE_advert_OnOff(false);
 		// Disable watchdog timer
 		wdt_disable();
+		//  Play powerdown song
+		buzzOn(tone4, 150);
+		buzzOn(tone2, 150);
+		buzzOn(tone1, 150);			
 		//  Switch-Over to low power internal clock
 		ext_osc_onoff(false);
 		//  Put hardware in low-power state
@@ -2518,19 +2237,24 @@ void fn_powerdown(void){
 }
 
 void fn_powerup(void){
-	config_pins_powerup();
-	delay_ms(100);
-	
 	//  Setup GCLK 0 for 48MHZ
 	mainClockPowerup();
+	
+	config_pins_powerup();
+	//delay_ms(10);
+	//  Play powerup song
+	buzzOn(tone1, 150);
+	buzzOn(tone2, 150);
+	buzzOn(tone4, 150);
+	
 	//  Various setups
-	enable_comms();
-	
-	
+	enable_comms();	
 	load_user_settings();//  Needed for backlight setting
 	backlightOn(&options.backlight_setting);
-	configure_extint_channel();
-	configure_extint_callbacks();
+	
+	
+	//configure_extint_channel();
+	//configure_extint_callbacks();
 	setup_accel(&slave_acc1);
 	setup_accel(&slave_acc2);
 	setup_mag(&slave_mag1);
@@ -2539,10 +2263,10 @@ void fn_powerup(void){
 	
 	//  Turn on external clock and take it as a source
 	ext_osc_onoff(true);
-	delay_ms(10);	
+	//delay_ms(10);	
 
 	//  Initialize LCD controller
-	delay_ms(500);  //  Delay requested by LCD controller
+	//delay_ms(500);  //  Delay requested by LCD controller
 	glcd_init();
 	glcd_tiny_set_font(Font5x7,5,7,32,127);//  All font in "tiny" mode
 	
@@ -2551,8 +2275,8 @@ void fn_powerup(void){
 	configure_timer_1s();
 	configure_timer_ExtLong();
 	
-	//  Bluetooth Init
-	//BLE_init();
+	//  Try turning on bluetooth advertising
+	BLE_advert_OnOff(true);
 	
 	
 	//  Startup USB mass storage
@@ -2562,11 +2286,17 @@ void fn_powerup(void){
 	configure_SD();
 	udc_start();
 	
+	//  Setup Buttons
+	config_buttons();
 	
+	//  Initialize bluetooth measurement sync tracker
+	load_sync_tracker();
 	
 	//  Set initial conditions for state machine
 	buttonE_triggered=false;//  In case button was pressed again during powerup
-	current_input = input_state_complete;
+	current_state = st_main_display;
+	current_input = input_none;
+	last_input = input_none;
 	
 	
 	
@@ -2584,12 +2314,102 @@ void getDefaultOptions(struct OPTIONS *optionptr){
 	optionptr->backlight_setting.colorRef = 1;//white
 	optionptr->backlight_setting.brightness = 3;
 	optionptr->SerialNumber = 0;
-	optionptr->Settings_Initialized_Key = 0xC3;//  Indicator that settings have been initialized
 
 	
 }
 
 
+
+
+
+
+
+void processMeasurement(struct MEASUREMENT_FULL *measFullPtr){
+	struct MEASUREMENT *measPtr;
+	struct MEASUREMENT measTemp;
+	
+	//  Display Buffer Operations
+	switch (measFullPtr->meas_type){
+		case measRegular:
+			//  Point to Display Buffer
+			measPtr = &measBuf[measBufInd];
+			// Increment Counter
+			circBuffInc(&measBufInd, N_MEASBUF);	
+			break;
+		case measScan:
+			//  Point to temporary location
+			measPtr = &measTemp;
+			break;
+		case measQuick:
+			//  Point to Display Buffer
+			measPtr = &measBuf[measBufInd];
+			//  Do not increment
+			break;	
+		default:
+			return;
+	}
+	//  Copy Data Over
+	memcpy(measPtr,measFullPtr,sizeof(*measPtr));
+	
+	//  SD Card Storage
+	//  Also updates BLE measurement tracker
+	switch (measFullPtr->meas_type){
+		case measRegular:
+			save_measurement(measPtr);
+			break;
+		case measScan:
+			save_measurement(measPtr);
+			break;
+		case measQuick:
+			//  Do Nothing
+			break;
+		default:
+			return;
+	}
+	
+		
+}
+
+void fn_firmware(void){
+	
+	if (state_change) {
+		
+	}
+	
+	
+	
+	glcd_clear_buffer();
+	//  Display Title
+	sprintf(display_str,"Firmware:");
+	glcd_tiny_draw_string(0,0,display_str);
+	
+	if(last_input==input_button1){
+		NVIC_SystemReset();
+
+	}
+	
+	// Display soft keys
+	drawSoftKeys("Bootloader","","","Back");
+	
+	
+	sprintf(display_str,"Firmware Ver: %0.2f", SOFTWARE_VERSION);
+	glcd_tiny_draw_string(0, 3,display_str);
+	
+	sprintf(display_str,"Hardware Ver: %s", HARDWARE_VERSION);
+	glcd_tiny_draw_string(0, 4,display_str);
+	
+	strcpy(display_str,"Press and hold");
+	glcd_tiny_draw_string(0, 5,display_str);
+	strcpy(display_str,"\"Bootloader\" for");
+	glcd_tiny_draw_string(0, 6,display_str);
+	strcpy(display_str,"USB Bootloader");
+	glcd_tiny_draw_string(0, 7,display_str);
+
+	
+	glcd_write();
+	
+	
+}
 
 
 void msc_notify_trans(void){
@@ -2601,15 +2421,29 @@ void msc_notify_trans(void){
 
 bool my_callback_msc_enable(void)
 {
-	my_flag_autorize_msc_transfert = true;
+	SD_WriteLockout = true;
 	return true;
 }
 void my_callback_msc_disable(void)
 {
-	my_flag_autorize_msc_transfert = false;
+	SD_WriteLockout = true;
 }
 
-
-
-
-
+void UsbHandleTransactions(void){
+	
+	if (current_state==st_powerdown){
+		return;
+	}
+	if (usb_transaction_requested){
+		spi_setBaud(baudRateMax);
+		while(udi_msc_process_trans());
+			
+		usb_transaction_requested = false;		
+		spi_setBaud(baudRateMin);		
+	}
+	if(current_input== input_usb_transaction){
+		current_input = input_none;
+	}
+	
+}
+			

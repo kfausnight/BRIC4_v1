@@ -134,11 +134,7 @@ src/ASF/sam0/drivers/sercom/i2c/i2c_sam0/i2c_master.d \
  ../src/ASF/sam0/drivers/system/reset/reset_sam_l/reset.h \
  ../src/ASF/sam0/drivers/system/interrupt/system_interrupt.h \
  ../src/ASF/sam0/drivers/system/interrupt/system_interrupt_saml21/system_interrupt_features.h \
- ../src/ASF/sam0/drivers/sercom/sercom_pinout.h \
- ../src/ASF/sam0/drivers/sercom/sercom_interrupt.h \
- ../src/ASF/sam0/drivers/sercom/sercom.h \
- ../src/ASF/sam0/drivers/sercom/i2c/i2c_master_interrupt.h \
- ../src/ASF/sam0/drivers/sercom/i2c/i2c_master.h
+ ../src/ASF/sam0/drivers/sercom/sercom_pinout.h
 
 ../src/ASF/sam0/drivers/sercom/i2c/i2c_master.h:
 
@@ -409,11 +405,3 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-no
 ../src/ASF/sam0/drivers/system/interrupt/system_interrupt_saml21/system_interrupt_features.h:
 
 ../src/ASF/sam0/drivers/sercom/sercom_pinout.h:
-
-../src/ASF/sam0/drivers/sercom/sercom_interrupt.h:
-
-../src/ASF/sam0/drivers/sercom/sercom.h:
-
-../src/ASF/sam0/drivers/sercom/i2c/i2c_master_interrupt.h:
-
-../src/ASF/sam0/drivers/sercom/i2c/i2c_master.h:

@@ -18,13 +18,10 @@
 
 
 // miscellaneous
-void quick_measurement( struct MEASUREMENT *);
-void full_measurement( struct MEASUREMENT *, uint8_t);
-void error_check(struct MEASUREMENT *);
-void adjustErrorSensitivity(void);
-bool increment_error_count(struct MEASUREMENT *);
-float calc_magnitude(float *);
-void gen_err_message(char *, struct MEASUREMENT *, uint8_t);
+void quick_measurement( struct MEASUREMENT_FULL *);
+//void scan_measurement( struct MEASUREMENT_FULL *);
+void full_measurement( struct MEASUREMENT_FULL *, uint8_t, enum MEAS_TYPE);
+
 
 //Accelerometer functions
 void setup_accel(struct spi_slave_inst *const);
@@ -41,12 +38,11 @@ void parse_mag_arr(uint8_t *, float *);
 
 
 //Laser Distance Functions
+void laser_start_continuous(void);
 void laser_on_off(bool);
-void beep_on_off(bool);
 void rangefinder_on_off(bool );
-void laser_parse_buffer(struct MEASUREMENT *meas_inst);
+void laser_parse_buffer(struct MEASUREMENT_FULL *meas_inst);
 void laser_delay(uint8_t);
-void laser_beep(void);
 bool isLaserOn(void);
 
 

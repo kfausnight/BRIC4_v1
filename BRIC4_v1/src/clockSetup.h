@@ -27,12 +27,13 @@ void DFLL_Enable(void);
 
 // External Clock Functions
 void get_time(void);
-void set_time(void);
+void set_time(struct TIME *);
 void ext_osc_onoff(bool);
 uint32_t bcd2int(uint8_t);
 uint8_t int2bcd(uint8_t);
+bool time_quality_check(struct TIME *);
 uint32_t gen_posix_time(struct TIME *);
-uint8_t incBcdData(uint8_t, int8_t, uint8_t, uint8_t);
+
 
 //#include <main.h>
 

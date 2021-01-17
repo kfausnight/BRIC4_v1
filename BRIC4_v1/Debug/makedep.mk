@@ -42,11 +42,17 @@ src\batteryManagement.c
 
 src\BLE_func.c
 
+src\buttons.c
+
+src\Buzzer.c
+
 src\clockSetup.c
 
 src\dispFunctions.c
 
 src\EEPROM.c
+
+src\errorsBRIC4.c
 
 src\mathBRIC.c
 
@@ -68,13 +74,7 @@ src\ASF\sam0\drivers\extint\extint_callback.c
 
 src\ASF\sam0\drivers\extint\extint_sam_l_c\extint.c
 
-src\ASF\sam0\drivers\rtc\rtc_sam_l_c\rtc_count.c
-
-src\ASF\sam0\drivers\rtc\rtc_sam_l_c\rtc_count_interrupt.c
-
 src\ASF\sam0\drivers\sercom\i2c\i2c_sam0\i2c_master.c
-
-src\ASF\sam0\drivers\sercom\i2c\i2c_sam0\i2c_master_interrupt.c
 
 src\ASF\sam0\drivers\sercom\sercom_interrupt.c
 

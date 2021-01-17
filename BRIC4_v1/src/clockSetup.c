@@ -18,30 +18,6 @@ uint32_t days_per_month_acc[12] = {0,  31, 59, 90,  120, 151, 181, 212, 243, 273
 
 bool isExtClockEnabled = false;
 
-/*
-
-void setup_XOSC32k(void){
-	struct system_clock_source_xosc32k_config xosc32k_conf;
-	system_clock_source_xosc32k_get_config_defaults(&xosc32k_conf);
-
-	xosc32k_conf.frequency           = 32768UL;
-	xosc32k_conf.external_clock      = SYSTEM_CLOCK_EXTERNAL_CLOCK;//CONF_CLOCK_XOSC32K_EXTERNAL_CRYSTAL;
-	xosc32k_conf.startup_time        = SYSTEM_XOSC32K_STARTUP_2048;//CONF_CLOCK_XOSC32K_STARTUP_TIME;
-	xosc32k_conf.enable_1khz_output  = true;//CONF_CLOCK_XOSC32K_ENABLE_1KHZ_OUPUT;
-	xosc32k_conf.enable_32khz_output = true;//CONF_CLOCK_XOSC32K_ENABLE_32KHZ_OUTPUT;
-	xosc32k_conf.on_demand           = false;
-	xosc32k_conf.run_in_standby      = true;//CONF_CLOCK_XOSC32K_RUN_IN_STANDBY;
-
-	system_clock_source_xosc32k_set_config(&xosc32k_conf);
-	system_clock_source_enable(SYSTEM_CLOCK_SOURCE_XOSC32K);
-	while(!system_clock_source_is_ready(SYSTEM_CLOCK_SOURCE_XOSC32K));
-	OSC32KCTRL->XOSC32K.bit.ONDEMAND = 1;
-	
-
-
-}
-*/
-
 
 void clock_32k_source(enum clock_type ext_int){
 	struct system_gclk_gen_config gclock_gen_conf;
@@ -204,36 +180,38 @@ void get_time(void){
 	temp_buf[0]=0x00;
 	i2c_read_write(readp, rtc_add, temp_buf, 19);
 	//Parse Data
-	current_time.seconds=	temp_buf[0x01];
-	current_time.minutes=	temp_buf[0x02];
-	current_time.hours=		temp_buf[0x03];
-	current_time.date=		temp_buf[0x05] ;
-	current_time.month=		temp_buf[0x06] & 0x7F;//mask out first "century" bit
-	current_time.year=		temp_buf[0x07];
-	current_time.control=	temp_buf[0x0F];
-	current_time.control_status=	temp_buf[0x10];
+	current_time.seconds=	bcd2int(temp_buf[0x01]);
+	current_time.minutes=	bcd2int(temp_buf[0x02]);
+	current_time.hours=		bcd2int(temp_buf[0x03]);
+	current_time.day=		bcd2int(temp_buf[0x05]);
+	current_time.month=		bcd2int(temp_buf[0x06] & 0x7F);//mask out first "century" bit
+	current_time.year=		bcd2int(temp_buf[0x07])+2000;
+	
+	current_time.centiseconds = getCentiSeconds();
+	
+	//  Also get the temperature from the RTC
 	temp_var16=temp_buf[0x12];
 	temp_var16=temp_var16<<8;
 	temp_var16=temp_var16+temp_buf[0x13];
-	current_time.temperatureC=temp_var16;
-	current_time.temperatureC=current_time.temperatureC/256;
-	current_time.temperatureF=current_time.temperatureC*1.8+32;
+	
+	currentTempC=temp_var16;
+	currentTempC=currentTempC/256;
 	
 }
 
-void set_time(void){
+void set_time(struct TIME *temp_time){
 	uint8_t temp_buf[20];
 
 	temp_buf[0]=0x00;
 
 	//Parse Data
-	temp_buf[0x01]=temp_time.seconds;
-	temp_buf[0x02]=temp_time.minutes;
-	temp_buf[0x03]=temp_time.hours;
-	temp_buf[0x04]=temp_time.day;
-	temp_buf[0x05]=temp_time.date;
-	temp_buf[0x06]=temp_time.month;
-	temp_buf[0x07]=temp_time.year;
+	temp_buf[0x01]= int2bcd(temp_time->seconds);
+	temp_buf[0x02]= int2bcd(temp_time->minutes);
+	temp_buf[0x03]= int2bcd(temp_time->hours);
+	temp_buf[0x04]= 0x00;
+	temp_buf[0x05]= int2bcd(temp_time->day);
+	temp_buf[0x06]= int2bcd(temp_time->month);
+	temp_buf[0x07]= int2bcd(temp_time->year-2000);
 	i2c_read_write(writep, rtc_add, temp_buf, 8);
 	
 }
@@ -304,17 +282,58 @@ void ext_osc_onoff(bool onoff){
 
 
 
+bool time_quality_check(struct TIME *time_inst){
+	bool isValid = true;
+	
+	if(time_inst->year<1900){
+		time_inst->year = 1900;
+		isValid = false;
+	}
+	
+	if(time_inst->month<1){
+		time_inst->month = 1;
+		isValid = false;
+	}else if(time_inst->month>12){
+		time_inst->month = 12;
+		isValid = false;
+	}
+	
+	if(time_inst->day<1){
+		time_inst->day = 1;
+		isValid = false;
+	}else if(time_inst->day>31){
+		time_inst->day = 31;
+		isValid = false;
+	}
+	
+	if(time_inst->hours>24){
+		time_inst->hours = 24;
+		isValid = false;
+	}
+	
+	return isValid;
+	
+}
+
 uint32_t gen_posix_time(struct TIME *time_inst){
 	//https://stackoverflow.com/questions/21975472/how-to-calculate-epoch-day
 	uint32_t posix_time;
 	uint32_t tm_sec, tm_min, tm_hour, tm_yday, tm_year, tm_month;
 	
+	tm_sec = time_inst->seconds;
+	tm_min = time_inst->minutes;
+	tm_hour = time_inst->hours;
+	tm_year = time_inst->year-1900;//  Years since 1900 per algorithm
+	tm_yday = time_inst->day;
+	tm_month = time_inst->month;
+	/*
 	tm_sec = bcd2int(time_inst->seconds);
 	tm_min = bcd2int(time_inst->minutes);
 	tm_hour = bcd2int(time_inst->hours);
-	tm_year = bcd2int(time_inst->year)+100;//  Years since 1900, time_inst->year is years since 2000
+	tm_year = bcd2int(time_inst->year)-1900;//  Years since 1900 per algorithm
 	tm_yday = bcd2int(time_inst->date);
 	tm_month = bcd2int(time_inst->month);
+	*/
 	
 	//  Find days since year roll-over
 	// On "days_per_month_acc" index, subtract 1 to account for 0-base index.
@@ -334,26 +353,6 @@ uint32_t gen_posix_time(struct TIME *time_inst){
 	
 }
 
-uint8_t incBcdData(uint8_t bcdData, int8_t increment, uint8_t dataMin, uint8_t dataMax){
-	
-	uint8_t intData;
-	intData = bcd2int(bcdData);
-	
-	if (increment<0){
-		if (intData>dataMin){
-			intData = intData-1;
-		}else{
-			intData = dataMax;
-		}
-	}else{
-		if (intData<dataMax){
-			intData = intData+1;
-		}else{
-			intData = dataMin;
-		}
-	}
-	return int2bcd(intData);
-}
 
 
 

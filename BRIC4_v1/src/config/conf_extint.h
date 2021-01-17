@@ -43,13 +43,17 @@
  *
  * EXTINT_CLK_ULP32K is available for SAM L21/C21.
  */
+///////////////////////////////////////////////
+//  Kfausnight 20201018
+// "extint.c" cannot see this definition for some reason.
+//  Copying this definition to "extint.c"
 #define EXTINT_CLOCK_SELECTION   EXTINT_CLK_ULP32K
  
 /**
  * Define which GCLK source is used when selecting EXTINT_CLK_GCLK type.
  */
-#if (EXTINT_CLOCK_SELECTION == EXTINT_CLK_GCLK)
-#  define EXTINT_CLOCK_SOURCE      GCLK_GENERATOR_0
-#endif
+//#if (EXTINT_CLOCK_SELECTION == EXTINT_CLK_GCLK)
+//#  define EXTINT_CLOCK_SOURCE      GCLK_GENERATOR_0
+//#endif
 
 #endif

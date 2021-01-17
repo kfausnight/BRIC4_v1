@@ -20,15 +20,19 @@
 //WDT Functions
 void wdt_enable(void);
 void wdt_disable(void);
+// RTC Functions
+void configure_rtc_count(void);
 //  TC Functions
 void timer_callback_longbutton(void);
 void timer_callback_laser_timeout(void);
 void timer_callback_1s(void );
+void timer_callback_backgroundCounter(void);
 void configure_timer_1s(void);
 void configure_timer_counter(void);
 void configure_timer_ExtLong(void);
 
 uint32_t getCurrentMs(void);
+uint8_t getCentiSeconds(void);
 
 void idle_timeout(void);
 void laser_timeout(void);

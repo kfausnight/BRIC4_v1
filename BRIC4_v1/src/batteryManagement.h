@@ -17,9 +17,11 @@
 void setup_batt(void);
 void config_batt(void);
 uint16_t getBatteryLevel(void);
+void BleUpdateBattLevel(void);
 
 
 //Battery Charger
+void setupCharger(void);
 void setChargeCurrent(uint32_t);
 uint8_t getChargerStatus(void);
 uint8_t getChargerRegister(uint8_t);

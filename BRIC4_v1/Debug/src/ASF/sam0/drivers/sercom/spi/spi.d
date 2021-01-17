@@ -157,10 +157,6 @@ src/ASF/sam0/drivers/sercom/spi/spi.d \
  ../src/ASF/common/services/ioport/sam0/ioport.h \
  ../src/ASF/common/services/storage/ctrl_access/ctrl_access.h \
  ../src/config/conf_access.h ../src/comms\sd_mmc_mem.h \
- ../src/ASF/sam0/drivers/rtc/rtc_count.h ../src/config/conf_clocks.h \
- ../src/ASF/sam0/drivers/rtc/rtc_count_interrupt.h \
- ../src/ASF/sam0/drivers/rtc/rtc_count.h \
- ../src/ASF/sam0/drivers/rtc/rtc_tamper.h \
  ../src/ASF/sam0/drivers/usb/stack_interface/usb_dual.h \
  ../src/ASF/common2/components/memory/sd_mmc/sd_mmc.h \
  ../src/config/conf_sd_mmc.h ../src/clockSetup.h ../src/main.h \
@@ -169,7 +165,8 @@ src/ASF/sam0/drivers/sercom/spi/spi.d \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\math.h \
  ../src/timers.h ../src/BLE_func.h ../src/comms/comms.h ../src/sensors.h \
  ../src/mathBRIC.h ../src/calibration.h ../src/backlight.h \
- ../src/dispFunctions.h ../src/SDcardBRIC.h ../src/EEPROM.h \
+ ../src/dispFunctions.h ../src/SDcardBRIC.h ../src/Buzzer.h \
+ ../src/errorsBRIC4.h ../src/EEPROM.h ../src/buttons.h \
  ../src/batteryManagement.h ../src/glcd\glcd.h ../src/glcd\ATSAML21.h \
  ../src/glcd\ATSAML21.h ../src/glcd\ST7565R.h ../src/glcd\glcd_graphics.h \
  ../src/glcd\glcd_text_tiny.h ../src/glcd\glcd_text.h \
@@ -179,8 +176,6 @@ src/ASF/sam0/drivers/sercom/spi/spi.d \
  ../src/ASF/sam0/drivers/sercom/i2c/i2c_common.h \
  ../src/ASF/sam0/drivers/sercom/i2c/i2c_master.h \
  ../src/ASF/sam0/drivers/sercom/i2c/i2c_common.h \
- ../src/ASF/sam0/drivers/sercom/i2c/i2c_master_interrupt.h \
- ../src/ASF/sam0/drivers/sercom/i2c/i2c_master.h \
  ../src/ASF/sam0/drivers/sercom/spi/spi.h \
  ../src/ASF/sam0/drivers/sercom/usart/usart.h \
  ../src/ASF/sam0/drivers/sercom/usart/usart_interrupt.h \
@@ -533,16 +528,6 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-no
 
 ../src/comms\sd_mmc_mem.h:
 
-../src/ASF/sam0/drivers/rtc/rtc_count.h:
-
-../src/config/conf_clocks.h:
-
-../src/ASF/sam0/drivers/rtc/rtc_count_interrupt.h:
-
-../src/ASF/sam0/drivers/rtc/rtc_count.h:
-
-../src/ASF/sam0/drivers/rtc/rtc_tamper.h:
-
 ../src/ASF/sam0/drivers/usb/stack_interface/usb_dual.h:
 
 ../src/ASF/common2/components/memory/sd_mmc/sd_mmc.h:
@@ -577,7 +562,13 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-no
 
 ../src/SDcardBRIC.h:
 
+../src/Buzzer.h:
+
+../src/errorsBRIC4.h:
+
 ../src/EEPROM.h:
+
+../src/buttons.h:
 
 ../src/batteryManagement.h:
 
@@ -608,10 +599,6 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-no
 ../src/ASF/sam0/drivers/sercom/i2c/i2c_master.h:
 
 ../src/ASF/sam0/drivers/sercom/i2c/i2c_common.h:
-
-../src/ASF/sam0/drivers/sercom/i2c/i2c_master_interrupt.h:
-
-../src/ASF/sam0/drivers/sercom/i2c/i2c_master.h:
 
 ../src/ASF/sam0/drivers/sercom/spi/spi.h:
 

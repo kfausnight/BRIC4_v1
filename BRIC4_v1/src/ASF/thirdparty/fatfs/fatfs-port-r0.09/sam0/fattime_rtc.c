@@ -87,12 +87,12 @@ uint32_t get_fattime(void)
 	uint32_t ul_time;
 
 	// Format into FAT time stamp format
-	ul_time = ((bcd2int(current_time.year) +20 ) << 25)
-	| (bcd2int(current_time.month) << 21)
-	| (bcd2int(current_time.date) << 16)
-	| (bcd2int(current_time.hours) << 11)
-	| (bcd2int(current_time.minutes) << 5)
-	| ((bcd2int(current_time.seconds) >> 1) << 0);
+	ul_time = ((current_time.year -1980 ) << 25)
+	| (current_time.month << 21)
+	| (current_time.day << 16)
+	| (current_time.hours << 11)
+	| (current_time.minutes << 5)
+	| ((current_time.seconds >> 1) << 0);
 
 	return ul_time;
 }
